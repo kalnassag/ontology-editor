@@ -1,0 +1,138 @@
+@prefix : <http://example.org/health#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# ── Ontology Declaration ────────────────────────────────────────────────
+
+<http://example.org/health> a owl:Ontology
+    ; rdfs:label "Health Information Ontology"@en
+    ; rdfs:comment "A sample ontology for testing the ontology editor."@en
+    .
+
+# ── Classes ─────────────────────────────────────────────────────────────
+
+:Condition a owl:Class
+    ; rdfs:label "Condition"@en
+    ; rdfs:label "Zustand"@de
+    ; rdfs:comment "A health condition or disease."@en
+    .
+
+:Symptom a owl:Class
+    ; rdfs:label "Symptom"@en
+    ; rdfs:comment "An observable sign or symptom of a condition."@en
+    .
+
+:Treatment a owl:Class
+    ; rdfs:label "Treatment"@en
+    ; rdfs:comment "A therapeutic intervention for a condition."@en
+    ; rdfs:subClassOf :HealthIntervention
+    .
+
+:HealthIntervention a owl:Class
+    ; rdfs:label "Health Intervention"@en
+    ; rdfs:comment "Any action taken to improve health outcomes."@en
+    .
+
+:Medication a owl:Class
+    ; rdfs:label "Medication"@en
+    ; rdfs:comment "A pharmaceutical substance used in treatment."@en
+    ; rdfs:subClassOf :Treatment
+    .
+
+:BodySite a owl:Class
+    ; rdfs:label "Body Site"@en
+    ; rdfs:comment "An anatomical location on the body."@en
+    .
+
+# ── Object Properties ──────────────────────────────────────────────────
+
+:hasSymptom a owl:ObjectProperty
+    ; rdfs:label "has symptom"@en
+    ; rdfs:comment "Relates a condition to its symptoms."@en
+    ; rdfs:domain :Condition
+    ; rdfs:range :Symptom
+    .
+
+:hasTreatment a owl:ObjectProperty
+    ; rdfs:label "has treatment"@en
+    ; rdfs:comment "Relates a condition to a possible treatment."@en
+    ; rdfs:domain :Condition
+    ; rdfs:range :Treatment
+    .
+
+:affectsBodySite a owl:ObjectProperty
+    ; rdfs:label "affects body site"@en
+    ; rdfs:comment "Relates a condition to the body site it affects."@en
+    ; rdfs:domain :Condition
+    ; rdfs:range :BodySite
+    .
+
+:activeIngredient a owl:ObjectProperty
+    ; rdfs:label "active ingredient"@en
+    ; rdfs:domain :Medication
+    .
+
+:contraindicatedWith a owl:ObjectProperty
+    ; rdfs:label "contraindicated with"@en
+    ; rdfs:comment "Indicates that a medication should not be used with another."@en
+    ; rdfs:domain :Medication
+    ; rdfs:range :Medication
+    .
+
+# ── Datatype Properties ────────────────────────────────────────────────
+
+:icdCode a owl:DatatypeProperty
+    ; rdfs:label "ICD code"@en
+    ; rdfs:comment "The ICD-10 classification code for a condition."@en
+    ; rdfs:domain :Condition
+    ; rdfs:range xsd:string
+    .
+
+:severity a owl:DatatypeProperty
+    ; rdfs:label "severity"@en
+    ; rdfs:comment "Severity rating from 1-5."@en
+    ; rdfs:domain :Symptom
+    ; rdfs:range xsd:integer
+    .
+
+:dosageMg a owl:DatatypeProperty
+    ; rdfs:label "dosage (mg)"@en
+    ; rdfs:domain :Medication
+    ; rdfs:range xsd:decimal
+    .
+
+:isChronicity a owl:DatatypeProperty
+    ; rdfs:label "is chronic"@en
+    ; rdfs:comment "Whether the condition is chronic."@en
+    ; rdfs:domain :Condition
+    ; rdfs:range xsd:boolean
+    .
+
+:onsetDate a owl:DatatypeProperty
+    ; rdfs:label "onset date"@en
+    ; rdfs:domain :Condition
+    ; rdfs:range xsd:date
+    .
+
+# ── Annotation Properties ──────────────────────────────────────────────
+
+:snomedCode a owl:AnnotationProperty
+    ; rdfs:label "SNOMED CT code"@en
+    ; rdfs:comment "The SNOMED CT concept identifier."@en
+    ; rdfs:domain :Condition
+    .
+
+:editorialNote a owl:AnnotationProperty
+    ; rdfs:label "editorial note"@en
+    ; rdfs:comment "Internal note for content editors."@en
+    ; rdfs:domain :Condition
+    .
+
+:evidenceLevel a owl:AnnotationProperty
+    ; rdfs:label "evidence level"@en
+    ; rdfs:domain :Treatment
+    .

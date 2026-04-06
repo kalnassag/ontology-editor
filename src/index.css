@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ── Theme variables ──────────────────────────────────────────────── */
+  :root {
+    --th-base: #ffffff;
+    --th-surface: #f8fafc;
+    --th-input: #f1f5f9;
+    --th-hover: #e2e8f0;
+    --th-border: #cbd5e1;
+    --th-border-muted: #e2e8f0;
+    --th-fg: #0f172a;
+    --th-fg-2: #475569;
+    --th-fg-3: #64748b;
+    --th-fg-4: #94a3b8;
+  }
+
+  .dark {
+    --th-base: #0f172a;
+    --th-surface: #1e293b;
+    --th-input: #1e293b;
+    --th-hover: #334155;
+    --th-border: #475569;
+    --th-border-muted: #334155;
+    --th-fg: #f1f5f9;
+    --th-fg-2: #cbd5e1;
+    --th-fg-3: #94a3b8;
+    --th-fg-4: #64748b;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--th-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--th-fg-4);
+  }
+
+  /* Selection colour */
+  ::selection {
+    background: #3b82f6;
+    color: white;
+  }
+}
+
+@layer components {
+  /* Consistent input styling */
+  .input-base {
+    @apply rounded border border-th-border bg-th-input px-2.5 py-1.5 text-sm text-th-fg
+      placeholder:text-th-fg-4 focus:border-blue-500 focus:outline-none focus:ring-1
+      focus:ring-blue-500/30 transition-colors;
+  }
+
+  .input-mono {
+    @apply input-base font-mono text-xs;
+  }
+
+  /* Property type badges */
+  .badge-object {
+    @apply rounded-sm bg-prop-object-500/15 px-1.5 py-0.5 text-2xs font-medium
+      text-prop-object-500 ring-1 ring-inset ring-prop-object-500/25;
+  }
+  .badge-datatype {
+    @apply rounded-sm bg-prop-datatype-500/15 px-1.5 py-0.5 text-2xs font-medium
+      text-prop-datatype-500 ring-1 ring-inset ring-prop-datatype-500/25;
+  }
+  .badge-annotation {
+    @apply rounded-sm bg-prop-annotation-500/15 px-1.5 py-0.5 text-2xs font-medium
+      text-prop-annotation-500 ring-1 ring-inset ring-prop-annotation-500/25;
+  }
+}

@@ -1,0 +1,291 @@
+/**
+ * Inline form for creating or editing an OWL property.
+ */
+
+import { useState } from "react";
+import { useStore } from "../lib/store";
+import { toCamelCase, XSD_TYPES, compact, expand } from "../lib/uri-utils";
+import LabelEditor from "./LabelEditor";
+import ExtraTripleEditor from "./ExtraTripleEditor";
+import type { OntologyProperty, LangString, PropertyType, ExtraTriple } from "../types";
+
+interface Props {
+  existing?: OntologyProperty;
+  /** Pre-set domain URI when opened from within a ClassCard */
+  defaultDomainUri?: string;
+  onDone: () => void;
+}
+
+const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
+  { value: "owl:ObjectProperty", label: "Object" },
+  { value: "owl:DatatypeProperty", label: "Datatype" },
+  { value: "owl:AnnotationProperty", label: "Annotation" },
+];
+
+export default function PropertyForm({ existing, defaultDomainUri, onDone }: Props) {
+  const addProperty = useStore((s) => s.addProperty);
+  const updateProperty = useStore((s) => s.updateProperty);
+  const activeOntology = useStore((s) => s.getActiveOntology());
+
+  const prefixes = activeOntology?.metadata.prefixes ?? {};
+
+  const [labels, setLabels] = useState<LangString[]>(
+    existing?.labels?.length ? existing.labels : [{ value: "", lang: "" }]
+  );
+  const [descriptions, setDescriptions] = useState<LangString[]>(
+    existing?.descriptions?.length ? existing.descriptions : []
+  );
+  const [localName, setLocalName] = useState(existing?.localName ?? "");
+  const [localNameManual, setLocalNameManual] = useState(!!existing);
+  const [propType, setPropType] = useState<PropertyType>(
+    existing?.type ?? "owl:DatatypeProperty"
+  );
+  const [domainUri, setDomainUri] = useState(existing?.domainUri ?? defaultDomainUri ?? "");
+  const [range, setRange] = useState(existing?.range ?? "");
+  const [subPropertyOf, setSubPropertyOf] = useState<string[]>(existing?.subPropertyOf ?? []);
+
+  // Extra triples — stored in compact/prefixed form for editing
+  const [extraTriples, setExtraTriples] = useState<ExtraTriple[]>(
+    (existing?.extraTriples ?? []).map((et) => ({
+      ...et,
+      predicate: compact(et.predicate, prefixes),
+      object: et.isLiteral ? et.object : compact(et.object, prefixes),
+    }))
+  );
+
+  const allClasses = activeOntology?.classes ?? [];
+  const allProperties = activeOntology?.properties ?? [];
+  const sameTypeProps = allProperties.filter(
+    (p) => p.type === propType && (!existing || p.id !== existing.id)
+  );
+
+  const derivedLocalName = localNameManual
+    ? localName
+    : toCamelCase(labels[0]?.value ?? "");
+
+  const handleSave = () => {
+    const effectiveName = derivedLocalName.trim() || "unnamedProperty";
+    const cleanLabels = labels.filter((l) => l.value.trim());
+    const cleanDescs = descriptions.filter((d) => d.value.trim());
+
+    // Expand prefixed names back to full URIs
+    const expandedTriples = extraTriples
+      .filter((t) => t.predicate.trim() && t.object.trim())
+      .map((t) => ({
+        ...t,
+        predicate: expand(t.predicate, prefixes),
+        object: t.isLiteral ? t.object : expand(t.object, prefixes),
+      }));
+
+    const data: Partial<OntologyProperty> = {
+      localName: effectiveName,
+      type: propType,
+      labels: cleanLabels.length ? cleanLabels : [{ value: effectiveName, lang: "" }],
+      descriptions: cleanDescs,
+      domainUri,
+      range,
+      subPropertyOf,
+      extraTriples: expandedTriples,
+    };
+
+    if (existing) {
+      updateProperty(existing.id, data);
+    } else {
+      addProperty(data);
+    }
+    onDone();
+  };
+
+  const toggleSubPropOf = (uri: string) => {
+    setSubPropertyOf((prev) =>
+      prev.includes(uri) ? prev.filter((u) => u !== uri) : [...prev, uri]
+    );
+  };
+
+  return (
+    <div className="space-y-3 rounded border border-th-border bg-th-surface p-3">
+      {/* Property type */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Type
+        </label>
+        <div className="flex gap-1">
+          {PROPERTY_TYPES.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setPropType(value)}
+              className={`rounded px-2 py-0.5 text-2xs font-medium ${
+                propType === value
+                  ? value === "owl:ObjectProperty"
+                    ? "bg-prop-object-600 text-white"
+                    : value === "owl:DatatypeProperty"
+                    ? "bg-prop-datatype-600 text-white"
+                    : "bg-prop-annotation-600 text-white"
+                  : "bg-th-hover text-th-fg-3 hover:bg-th-border"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Labels */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Labels
+        </label>
+        <LabelEditor values={labels} onChange={setLabels} placeholder="Property label" />
+      </div>
+
+      {/* Descriptions */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Descriptions
+        </label>
+        <LabelEditor
+          values={descriptions}
+          onChange={setDescriptions}
+          placeholder="Description"
+          multiline
+        />
+      </div>
+
+      {/* Local name */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Local Name
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={derivedLocalName}
+            onChange={(e) => { setLocalName(e.target.value); setLocalNameManual(true); }}
+            placeholder="camelCase"
+            className="flex-1 rounded bg-th-input px-2 py-1 font-mono text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {localNameManual && (
+            <button
+              onClick={() => { setLocalNameManual(false); setLocalName(""); }}
+              className="text-2xs text-th-fg-3 hover:text-th-fg"
+            >
+              auto
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Domain */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Domain
+        </label>
+        <select
+          value={domainUri}
+          onChange={(e) => setDomainUri(e.target.value)}
+          className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">(unassigned)</option>
+          {allClasses.map((cls) => (
+            <option key={cls.id} value={cls.uri}>
+              {cls.labels[0]?.value || cls.localName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Range */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Range
+        </label>
+        {propType === "owl:ObjectProperty" ? (
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">(none)</option>
+            {allClasses.map((cls) => (
+              <option key={cls.id} value={cls.uri}>
+                {cls.labels[0]?.value || cls.localName}
+              </option>
+            ))}
+          </select>
+        ) : propType === "owl:DatatypeProperty" ? (
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">(none)</option>
+            {Object.entries(XSD_TYPES).map(([compacted, full]) => (
+              <option key={full} value={full}>
+                {compacted}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            placeholder="URI or free text"
+            className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        )}
+      </div>
+
+      {/* subPropertyOf */}
+      {sameTypeProps.length > 0 && (
+        <div>
+          <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+            subPropertyOf
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {sameTypeProps.map((prop) => {
+              const selected = subPropertyOf.includes(prop.uri);
+              return (
+                <button
+                  key={prop.id}
+                  onClick={() => toggleSubPropOf(prop.uri)}
+                  className={`rounded px-2 py-0.5 text-2xs ${
+                    selected
+                      ? "bg-blue-600 text-white"
+                      : "bg-th-hover text-th-fg-3 hover:bg-th-border"
+                  }`}
+                >
+                  {prop.labels[0]?.value || prop.localName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Extra triples (prov:wasQuotedFrom, skos:*, etc.) */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Additional Annotations
+        </label>
+        <ExtraTripleEditor values={extraTriples} onChange={setExtraTriples} />
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500"
+        >
+          {existing ? "Save" : "Create"}
+        </button>
+        <button
+          onClick={onDone}
+          className="rounded bg-th-hover px-3 py-1 text-xs text-th-fg-2 hover:bg-th-border"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
