@@ -8,7 +8,8 @@
       "Bash(ls /usr/local/Cellar/node*)",
       "Bash(xxd /Users/kareem.alnassag/MyDocs/OntologyEditor/ontology-editor/src/components/PropertyRow.tsx)",
       "Bash(npx tsc:*)",
-      "Bash(~/.bun/bin/bunx tsc:*)"
+      "Bash(~/.bun/bin/bunx tsc:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -10,6 +10,7 @@
 import { useEffect, useCallback } from "react";
 import { Download, Save, Check, Loader2 } from "lucide-react";
 import { useStore } from "../lib/store";
+import { validate } from "../lib/validation";
 
 export default function ImportExport() {
   const exportTurtle = useStore((s) => s.exportTurtle);
@@ -22,6 +23,18 @@ export default function ImportExport() {
   const linked = hasFileHandle();
 
   const handleExport = () => {
+    if (activeOntology) {
+      const issues = validate(activeOntology);
+      const errors = issues.filter((i) => i.severity === "error");
+      if (errors.length > 0) {
+        const proceed = window.confirm(
+          `This ontology has ${errors.length} validation error${errors.length > 1 ? "s" : ""}:\n\n` +
+          errors.map((e) => `• ${e.message}`).join("\n") +
+          "\n\nExport anyway?"
+        );
+        if (!proceed) return;
+      }
+    }
     const text = exportTurtle();
     const blob = new Blob([text], { type: "text/turtle;charset=utf-8" });
     const url = URL.createObjectURL(blob);

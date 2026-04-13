@@ -3,7 +3,7 @@
  */
 
 import { useRef, useState } from "react";
-import { Plus, Upload, Trash2, ChevronRight } from "lucide-react";
+import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { useStore } from "../lib/store";
 import { supportsFileSystemAccess, openTurtleFile } from "../lib/file-access";
 
@@ -20,6 +20,8 @@ export default function OntologyList() {
   const deleteOntology = useStore((s) => s.deleteOntology);
   const importOntology = useStore((s) => s.importOntology);
   const importOntologyWithHandle = useStore((s) => s.importOntologyWithHandle);
+  const importWarnings = useStore((s) => s.importWarnings);
+  const clearImportWarnings = useStore((s) => s.clearImportWarnings);
 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<NewOntologyForm>({ label: "", baseUri: "" });
@@ -139,6 +141,30 @@ export default function OntologyList() {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Import warnings */}
+      {importWarnings.length > 0 && (
+        <div className="border-b border-amber-600/40 bg-amber-950/30 p-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="flex items-center gap-1 text-2xs font-medium text-amber-400">
+              <AlertTriangle size={11} />
+              Import warnings
+            </span>
+            <button
+              onClick={clearImportWarnings}
+              className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"
+              title="Dismiss"
+            >
+              <X size={11} />
+            </button>
+          </div>
+          <ul className="space-y-0.5">
+            {importWarnings.map((w, i) => (
+              <li key={i} className="text-2xs text-amber-300/80">{w}</li>
+            ))}
+          </ul>
         </div>
       )}
 

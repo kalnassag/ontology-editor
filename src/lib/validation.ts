@@ -13,7 +13,7 @@
  * - subPropertyOf referencing non-existent property
  */
 
-import type { Ontology, OntologyClass, OntologyProperty, ValidationIssue } from "../types";
+import type { Ontology, ValidationIssue } from "../types";
 import { XSD_TYPES } from "./uri-utils";
 
 const xsdUris = new Set(Object.values(XSD_TYPES));
@@ -21,7 +21,6 @@ const xsdUris = new Set(Object.values(XSD_TYPES));
 export function validate(ontology: Ontology): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const classUris = new Set(ontology.classes.map((c) => c.uri));
-  const propertyUris = new Set(ontology.properties.map((p) => p.uri));
   const allUris = new Map<string, string>(); // uri → entityId for duplicate detection
 
   // Ontology-level

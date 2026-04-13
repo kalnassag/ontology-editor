@@ -274,6 +274,7 @@ export function parseTurtle(input: string): ParseResult {
   let baseUri = "";
   const triples: ParsedTriple[] = [];
   const errors: ParseError[] = [...tokErrors];
+  let blankNodeCount = 0;
 
   // Resolve a token to its full URI, or null if unresolvable
   const resolveNode = (tok: Token): string | null => {
@@ -379,6 +380,7 @@ export function parseTurtle(input: string): ParseResult {
     if (tok.type === "BARE" && tok.keyword === "_blank") {
       stream.next();
       skipToNextStatement();
+      blankNodeCount++;
       continue;
     }
 
@@ -470,7 +472,7 @@ export function parseTurtle(input: string): ParseResult {
     baseUri = prefixes[""];
   }
 
-  return { prefixes, baseUri, triples, errors };
+  return { prefixes, baseUri, triples, errors, blankNodeCount };
 }
 
 // ── Model builder ──────────────────────────────────────────────────────────

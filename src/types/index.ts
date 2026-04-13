@@ -163,6 +163,8 @@ export interface ParseResult {
   baseUri: string;
   triples: ParsedTriple[];
   errors: ParseError[];
+  /** Number of blank-node subjects encountered and skipped (data loss warning) */
+  blankNodeCount: number;
 }
 
 export interface ParseError {

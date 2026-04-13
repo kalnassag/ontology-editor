@@ -12,7 +12,9 @@ import UnassignedProperties from "./UnassignedProperties";
 import ImportExport from "./ImportExport";
 import OntologyGraph from "./OntologyGraph";
 import IndividualCard from "./IndividualCard";
-import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users } from "lucide-react";
+import ValidationPanel from "./ValidationPanel";
+import { validate } from "../lib/validation";
+import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck } from "lucide-react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -35,14 +37,43 @@ export default function App() {
   const init = useStore((s) => s.init);
   const initialized = useStore((s) => s.initialized);
   const activeOntology = useStore((s) => s.getActiveOntology());
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const canUndo = useStore((s) => s.canUndo);
+  const canRedo = useStore((s) => s.canRedo);
   const [addingClass, setAddingClass] = useState(false);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("classes");
   const [allExpanded, setAllExpanded] = useState(true);
   const [expandKey, setExpandKey] = useState(0); // forces re-render of cards with new default
+  const [showValidation, setShowValidation] = useState(false);
   const theme = useTheme();
 
   useEffect(() => { init(); }, [init]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo()) undo();
+      } else if ((e.key === "y") || (e.key === "z" && e.shiftKey)) {
+        e.preventDefault();
+        if (canRedo()) redo();
+      } else if (e.key === "n" && !e.shiftKey) {
+        // Only trigger new class if not in an input
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+          e.preventDefault();
+          setAddingClass(true);
+          setViewMode("classes");
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo, canUndo, canRedo]);
 
   const toggleExpandAll = useCallback(() => {
     setAllExpanded((prev) => {
@@ -189,8 +220,50 @@ export default function App() {
                 </button>
               )}
 
+              {/* Undo / Redo */}
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={undo}
+                  disabled={!canUndo()}
+                  className="rounded px-1.5 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg disabled:cursor-not-allowed disabled:opacity-30"
+                  title="Undo (Ctrl+Z)"
+                >
+                  ↩
+                </button>
+                <button
+                  onClick={redo}
+                  disabled={!canRedo()}
+                  className="rounded px-1.5 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg disabled:cursor-not-allowed disabled:opacity-30"
+                  title="Redo (Ctrl+Y)"
+                >
+                  ↪
+                </button>
+              </div>
+
+              {/* Validate */}
+              <button
+                onClick={() => setShowValidation((v) => !v)}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium ${
+                  showValidation
+                    ? "bg-th-hover text-th-fg"
+                    : "text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
+                }`}
+                title="Toggle validation panel"
+              >
+                <ShieldCheck size={12} />
+                Validate
+              </button>
+
               <ImportExport />
             </div>
+
+            {/* Validation panel */}
+            {showValidation && activeOntology && (
+              <ValidationPanel
+                issues={validate(activeOntology)}
+                onClose={() => setShowValidation(false)}
+              />
+            )}
 
             {/* Content: graph, classes, or individuals */}
             {viewMode === "graph" ? (

@@ -33,6 +33,19 @@ interface EditorState {
   /** Whether a file save is in progress */
   fileSaveInProgress: boolean;
 
+  // ── Undo / Redo ────────────────────────────────────────────────────
+  _history: Ontology[][];
+  _future: Ontology[][];
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  undo: () => void;
+  redo: () => void;
+
+  // ── Import feedback ────────────────────────────────────────────────
+  /** Warnings/errors from the most recent import (parse errors, blank nodes, etc.) */
+  importWarnings: string[];
+  clearImportWarnings: () => void;
+
   // ── Derived (convenience getters) ──────────────────────────────────
   getActiveOntology: () => Ontology | undefined;
   getPropertiesByDomain: () => Map<string, OntologyProperty[]>;
@@ -151,6 +164,9 @@ export const useStore = create<EditorState>((set, get) => {
     initialized: false,
     lastFileSaveTime: null,
     fileSaveInProgress: false,
+    _history: [],
+    _future: [],
+    importWarnings: [],
 
     // ── Derived ────────────────────────────────────────────────────────
     getActiveOntology: () => {
@@ -190,6 +206,39 @@ export const useStore = create<EditorState>((set, get) => {
       return id ? hasHandle(id) : false;
     },
 
+    // ── Undo / Redo ────────────────────────────────────────────────────
+    canUndo: () => get()._history.length > 0,
+    canRedo: () => get()._future.length > 0,
+
+    undo: () => {
+      set((s) => {
+        if (s._history.length === 0) return {};
+        const prev = s._history[s._history.length - 1]!;
+        return {
+          _history: s._history.slice(0, -1),
+          _future: [...s._future, s.ontologies],
+          ontologies: prev,
+        };
+      });
+      persistToDb();
+    },
+
+    redo: () => {
+      set((s) => {
+        if (s._future.length === 0) return {};
+        const next = s._future[s._future.length - 1]!;
+        return {
+          _history: [...s._history, s.ontologies],
+          _future: s._future.slice(0, -1),
+          ontologies: next,
+        };
+      });
+      persistToDb();
+    },
+
+    // ── Import feedback ────────────────────────────────────────────────
+    clearImportWarnings: () => set({ importWarnings: [] }),
+
     // ── Lifecycle ──────────────────────────────────────────────────────
     init: async () => {
       const ontologies = await loadAllOntologies();
@@ -222,9 +271,7 @@ export const useStore = create<EditorState>((set, get) => {
 
     importOntology: (turtleText, fileName) => {
       const parsed = parseTurtle(turtleText);
-      console.log("[parser] prefixes:", parsed.prefixes, "triples:", parsed.triples.length, "errors:", parsed.errors);
       const model = buildModelFromTriples(parsed);
-      console.log("[model] classes:", model.classes.length, "properties:", model.properties.length, "individuals:", model.individuals.length);
       const now = new Date().toISOString();
       const fallbackLabel = fileName.replace(/\.ttl$/i, "");
       const onto: Ontology = {
@@ -241,9 +288,22 @@ export const useStore = create<EditorState>((set, get) => {
         createdAt: now,
         updatedAt: now,
       };
+
+      // Build user-visible warnings from parse errors and data-loss events
+      const warnings: string[] = [];
+      for (const err of parsed.errors) {
+        warnings.push(err.line ? `Line ${err.line}: ${err.message}` : err.message);
+      }
+      if (parsed.blankNodeCount > 0) {
+        warnings.push(
+          `${parsed.blankNodeCount} blank-node statement${parsed.blankNodeCount > 1 ? "s" : ""} were skipped — blank nodes are not supported in v1.`
+        );
+      }
+
       set((s) => ({
         ontologies: [...s.ontologies, onto],
         activeOntologyId: onto.id,
+        importWarnings: warnings,
       }));
       saveOntology(onto);
       return onto.id;
@@ -283,6 +343,8 @@ export const useStore = create<EditorState>((set, get) => {
 
     updateMetadata: (patch) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           metadata: { ...o.metadata, ...patch },
@@ -312,6 +374,8 @@ export const useStore = create<EditorState>((set, get) => {
       };
 
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           classes: [...o.classes, cls],
@@ -323,6 +387,8 @@ export const useStore = create<EditorState>((set, get) => {
 
     updateClass: (id, patch) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           classes: o.classes.map((c) => (c.id === id ? { ...c, ...patch } : c)),
@@ -333,17 +399,18 @@ export const useStore = create<EditorState>((set, get) => {
 
     deleteClass: (id) => {
       set((s) => ({
-        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
-          ...o,
-          classes: o.classes.filter((c) => c.id !== id),
-          properties: o.properties.map((p) => {
-            const cls = o.classes.find((c) => c.id === id);
-            if (cls && p.domainUri === cls.uri) {
-              return { ...p, domainUri: "" };
-            }
-            return p;
-          }),
-        })),
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => {
+          const cls = o.classes.find((c) => c.id === id);
+          return {
+            ...o,
+            classes: o.classes.filter((c) => c.id !== id),
+            properties: o.properties.map((p) =>
+              cls && p.domainUri === cls.uri ? { ...p, domainUri: "" } : p
+            ),
+          };
+        }),
       }));
       persist();
     },
@@ -372,6 +439,8 @@ export const useStore = create<EditorState>((set, get) => {
       };
 
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           properties: [...o.properties, prop],
@@ -383,6 +452,8 @@ export const useStore = create<EditorState>((set, get) => {
 
     updateProperty: (id, patch) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           properties: o.properties.map((p) => (p.id === id ? { ...p, ...patch } : p)),
@@ -393,6 +464,8 @@ export const useStore = create<EditorState>((set, get) => {
 
     deleteProperty: (id) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           properties: o.properties.filter((p) => p.id !== id),
@@ -404,6 +477,8 @@ export const useStore = create<EditorState>((set, get) => {
     // ── Individual actions ────────────────────────────────────────────────
     updateIndividualProperty: (individualId, propertyIndex, patch) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           individuals: (o.individuals ?? []).map((ind) => {
@@ -422,6 +497,8 @@ export const useStore = create<EditorState>((set, get) => {
 
     addIndividualProperty: (individualId, propVal) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           individuals: (o.individuals ?? []).map((ind) =>
@@ -436,6 +513,8 @@ export const useStore = create<EditorState>((set, get) => {
 
     removeIndividualProperty: (individualId, propertyIndex) => {
       set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
         ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
           ...o,
           individuals: (o.individuals ?? []).map((ind) =>

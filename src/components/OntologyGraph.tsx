@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { useStore } from "../lib/store";
-import type { OntologyClass, OntologyProperty } from "../types";
+import type { OntologyClass } from "../types";
 
 interface Node {
   id: string;

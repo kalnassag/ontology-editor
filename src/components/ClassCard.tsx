@@ -1,38 +1,33 @@
-/**
- * Expandable card for a single OWL class.
- * Shows all properties where rdfs:domain = this class, grouped by type.
- */
-
-import { useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
-import { useStore } from "../lib/store";
-import { compact } from "../lib/uri-utils";
-import PropertyRow from "./PropertyRow";
-import ClassForm from "./ClassForm";
-import PropertyForm from "./PropertyForm";
-import type { OntologyClass } from "../types";
+import { useState } from 'react';
+import { useStore } from '../lib/store';
+import { compact } from '../lib/uri-utils';
+import PropertyRow from './PropertyRow';
+import ClassForm from './ClassForm';
+import PropertyForm from './PropertyForm';
+import type { OntologyClass } from '../types';
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
   cls: OntologyClass;
   defaultExpanded?: boolean;
 }
 
-const TYPE_ORDER: Array<"owl:ObjectProperty" | "owl:DatatypeProperty" | "owl:AnnotationProperty"> = [
-  "owl:ObjectProperty",
-  "owl:DatatypeProperty",
-  "owl:AnnotationProperty",
+const TYPE_ORDER: Array<'owl:ObjectProperty' | 'owl:DatatypeProperty' | 'owl:AnnotationProperty'> = [
+  'owl:ObjectProperty',
+  'owl:DatatypeProperty',
+  'owl:AnnotationProperty',
 ];
 
 const TYPE_LABEL: Record<string, string> = {
-  "owl:ObjectProperty": "Object",
-  "owl:DatatypeProperty": "Datatype",
-  "owl:AnnotationProperty": "Annotation",
+  'owl:ObjectProperty': 'Object',
+  'owl:DatatypeProperty': 'Datatype',
+  'owl:AnnotationProperty': 'Annotation',
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  "owl:ObjectProperty": "text-prop-object-500",
-  "owl:DatatypeProperty": "text-prop-datatype-500",
-  "owl:AnnotationProperty": "text-prop-annotation-500",
+  'owl:ObjectProperty': 'text-prop-object-500',
+  'owl:DatatypeProperty': 'text-prop-datatype-500',
+  'owl:AnnotationProperty': 'text-prop-annotation-500',
 };
 
 export default function ClassCard({ cls, defaultExpanded = true }: Props) {
@@ -73,7 +68,7 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
         <button
           onClick={() => setExpanded((e) => !e)}
           className="mt-0.5 flex-shrink-0 rounded p-1 text-th-fg-4 hover:text-th-fg-2"
-          title={expanded ? "Collapse" : "Expand"}
+          title={expanded ? 'Collapse' : 'Expand'}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
@@ -176,7 +171,7 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
                   <span className="text-2xs text-th-fg-4">→</span>
                   <span className="text-2xs text-th-fg">
                     {et.isLiteral
-                      ? `"${et.object}"${et.lang ? `@${et.lang}` : ""}${et.datatype ? `^^${compact(et.datatype, prefixes)}` : ""}`
+                      ? `"${et.object}"${et.lang ? `@${et.lang}` : ''}${et.datatype ? `^^${compact(et.datatype, prefixes)}` : ''}`
                       : compact(et.object, prefixes)}
                   </span>
                 </div>
