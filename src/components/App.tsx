@@ -11,10 +11,12 @@ import ClassForm from "./ClassForm";
 import UnassignedProperties from "./UnassignedProperties";
 import ImportExport from "./ImportExport";
 import OntologyGraph from "./OntologyGraph";
+import EntityGraph from "./EntityGraph";
 import IndividualCard from "./IndividualCard";
 import ValidationPanel from "./ValidationPanel";
+import ClassBrowserPanel from "./ClassBrowserPanel";
 import { validate } from "../lib/validation";
-import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck } from "lucide-react";
+import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -31,7 +33,7 @@ function useTheme() {
   return { dark, toggle: () => setDark((d) => !d) };
 }
 
-type ViewMode = "classes" | "individuals" | "graph";
+type ViewMode = "classes" | "individuals" | "graph" | "entity-graph";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -47,7 +49,19 @@ export default function App() {
   const [allExpanded, setAllExpanded] = useState(true);
   const [expandKey, setExpandKey] = useState(0); // forces re-render of cards with new default
   const [showValidation, setShowValidation] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [classBrowserCollapsed, setClassBrowserCollapsed] = useState(() => {
+    return localStorage.getItem("classBrowserCollapsed") === "true";
+  });
   const theme = useTheme();
+
+  const toggleClassBrowser = useCallback(() => {
+    setClassBrowserCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("classBrowserCollapsed", String(next));
+      return next;
+    });
+  }, []);
 
   useEffect(() => { init(); }, [init]);
 
@@ -117,8 +131,8 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-th-base font-sans text-th-fg">
-      {/* Sidebar */}
-      <aside className="flex w-56 flex-shrink-0 flex-col border-r border-th-border">
+      {/* Panel 1: Ontology list */}
+      <aside className="flex w-48 flex-shrink-0 flex-col border-r border-th-border">
         <div className="flex items-center gap-2 border-b border-th-border px-3 py-2.5">
           <div className="h-2 w-2 rounded-full bg-blue-500" />
           <h1 className="text-xs font-semibold tracking-tight text-th-fg-2">
@@ -136,6 +150,20 @@ export default function App() {
           <OntologyList />
         </div>
       </aside>
+
+      {/* Panel 2: Class browser (only when an ontology is loaded) */}
+      {activeOntology && !classBrowserCollapsed && (
+        <aside className="flex w-60 flex-shrink-0 flex-col border-r border-th-border">
+          <ClassBrowserPanel
+            onSelectClass={setSelectedClassId}
+            selectedClassId={selectedClassId}
+            onEditClass={(id) => {
+              setSelectedClassId(id);
+              setViewMode("classes");
+            }}
+          />
+        </aside>
+      )}
 
       {/* Main panel */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -160,6 +188,15 @@ export default function App() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-48 rounded bg-th-input px-2 py-1 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
+
+              {/* Class browser toggle */}
+              <button
+                onClick={toggleClassBrowser}
+                className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
+                title={classBrowserCollapsed ? "Show class browser" : "Hide class browser"}
+              >
+                {classBrowserCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+              </button>
 
               {/* View mode tabs */}
               <div className="flex rounded border border-th-border-muted">
@@ -196,20 +233,32 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setViewMode("graph")}
-                  className={`flex items-center gap-1 rounded-r border-l border-th-border-muted px-2 py-1 text-2xs font-medium ${
+                  className={`flex items-center gap-1 border-l border-th-border-muted px-2 py-1 text-2xs font-medium ${
                     viewMode === "graph"
                       ? "bg-blue-600 text-white"
                       : "text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
                   }`}
-                  title="Graph view"
+                  title="Class graph view"
                 >
                   <Network size={12} />
                   Graph
                 </button>
+                <button
+                  onClick={() => setViewMode("entity-graph")}
+                  className={`flex items-center gap-1 rounded-r border-l border-th-border-muted px-2 py-1 text-2xs font-medium ${
+                    viewMode === "entity-graph"
+                      ? "bg-blue-600 text-white"
+                      : "text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
+                  }`}
+                  title="Entity graph view"
+                >
+                  <Share2 size={12} />
+                  Entities
+                </button>
               </div>
 
               {/* Expand/Collapse all (only in classes or individuals view) */}
-              {viewMode !== "graph" && (
+              {viewMode !== "graph" && viewMode !== "entity-graph" && (
                 <button
                   onClick={toggleExpandAll}
                   className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
@@ -265,10 +314,14 @@ export default function App() {
               />
             )}
 
-            {/* Content: graph, classes, or individuals */}
+            {/* Content: graph, entity-graph, classes, or individuals */}
             {viewMode === "graph" ? (
               <div className="relative flex-1 overflow-hidden">
                 <OntologyGraph onClose={() => setViewMode("classes")} />
+              </div>
+            ) : viewMode === "entity-graph" ? (
+              <div className="relative flex-1 overflow-hidden">
+                <EntityGraph />
               </div>
             ) : viewMode === "individuals" ? (
               <div className="flex-1 overflow-y-auto px-4 py-3">

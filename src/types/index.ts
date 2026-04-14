@@ -137,6 +137,10 @@ export interface OntologyStore {
   updateProperty: (id: string, patch: Partial<OntologyProperty>) => void;
   deleteProperty: (id: string) => void;
 
+  // Actions — individuals
+  addIndividual: (label: string, typeUri: string) => string;
+  deleteIndividual: (id: string) => void;
+
   // Actions — export
   exportTurtle: () => string;
 
