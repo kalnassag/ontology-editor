@@ -8,9 +8,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "start": "node server/index.js",
+    "build:serve": "npm run build && npm start"
   },
   "dependencies": {
+    "express": "^4.22.1",
     "idb": "^8.0.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",

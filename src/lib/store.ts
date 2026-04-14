@@ -7,7 +7,7 @@
  */
 
 import { create } from "zustand";
-import type { Ontology, OntologyClass, OntologyMetadata, OntologyProperty, IndividualPropertyValue } from "../types";
+import type { Ontology, OntologyClass, OntologyMetadata, OntologyProperty, Individual, IndividualPropertyValue } from "../types";
 import { loadAllOntologies, saveOntology, deleteOntology as dbDelete, debounce } from "./persistence";
 import { buildUri, toPascalCase, toCamelCase, STANDARD_PREFIXES } from "./uri-utils";
 import { parseTurtle, buildModelFromTriples } from "./turtle-parser";
@@ -76,6 +76,8 @@ interface EditorState {
   deleteProperty: (id: string) => void;
 
   // ── Individual actions ──────────────────────────────────────────────
+  addIndividual: (label: string, typeUri: string) => string;
+  deleteIndividual: (id: string) => void;
   updateIndividualProperty: (
     individualId: string,
     propertyIndex: number,
@@ -475,6 +477,46 @@ export const useStore = create<EditorState>((set, get) => {
     },
 
     // ── Individual actions ────────────────────────────────────────────────
+    addIndividual: (label, typeUri) => {
+      const id = genId();
+      const onto = get().getActiveOntology();
+      if (!onto) return id;
+
+      const localNameVal = toCamelCase(label) || id;
+      const uri = buildUri(onto.metadata.baseUri, localNameVal);
+
+      const individual: Individual = {
+        id,
+        uri,
+        localName: localNameVal,
+        typeUris: [typeUri],
+        propertyValues: [],
+      };
+
+      set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
+          ...o,
+          individuals: [...(o.individuals ?? []), individual],
+        })),
+      }));
+      persist();
+      return id;
+    },
+
+    deleteIndividual: (id) => {
+      set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
+          ...o,
+          individuals: (o.individuals ?? []).filter((ind) => ind.id !== id),
+        })),
+      }));
+      persist();
+    },
+
     updateIndividualProperty: (individualId, propertyIndex, patch) => {
       set((s) => ({
         _history: [...s._history.slice(-49), s.ontologies],
