@@ -30,6 +30,7 @@ export interface OntologyClass {
   labels: LangString[];
   descriptions: LangString[];
   subClassOf: string[]; // URIs of parent classes
+  disjointWith: string[]; // URIs of disjoint classes (owl:disjointWith)
   /** Additional triples not mapped to dedicated fields (e.g., prov:wasQuotedFrom) */
   extraTriples: ExtraTriple[];
 }
@@ -45,6 +46,12 @@ export interface OntologyProperty {
   domainUri: string; // URI of the class this property belongs to (rdfs:domain)
   range: string; // Class URI (object), XSD URI (datatype), or free string (annotation)
   subPropertyOf: string[]; // URIs of parent properties
+  /** URI of the inverse property (owl:inverseOf) — ObjectProperty only */
+  inverseOf?: string;
+  /** Simplified cardinality constraints (not OWL 2 restriction blank nodes) */
+  minCardinality?: number;
+  maxCardinality?: number;
+  exactCardinality?: number;
   /** Additional triples not mapped to dedicated fields */
   extraTriples: ExtraTriple[];
 }

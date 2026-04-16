@@ -482,18 +482,23 @@ const RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
 
 const P = {
-  type:           RDF + "type",
-  label:          RDFS + "label",
-  comment:        RDFS + "comment",
-  domain:         RDFS + "domain",
-  range:          RDFS + "range",
-  subClassOf:     RDFS + "subClassOf",
-  subPropertyOf:  RDFS + "subPropertyOf",
-  ontology:       OWL + "Ontology",
-  owlClass:       OWL + "Class",
-  objProp:        OWL + "ObjectProperty",
-  dataProp:       OWL + "DatatypeProperty",
-  annotProp:      OWL + "AnnotationProperty",
+  type:             RDF + "type",
+  label:            RDFS + "label",
+  comment:          RDFS + "comment",
+  domain:           RDFS + "domain",
+  range:            RDFS + "range",
+  subClassOf:       RDFS + "subClassOf",
+  subPropertyOf:    RDFS + "subPropertyOf",
+  ontology:         OWL + "Ontology",
+  owlClass:         OWL + "Class",
+  objProp:          OWL + "ObjectProperty",
+  dataProp:         OWL + "DatatypeProperty",
+  annotProp:        OWL + "AnnotationProperty",
+  inverseOf:        OWL + "inverseOf",
+  disjointWith:     OWL + "disjointWith",
+  minCardinality:   OWL + "minCardinality",
+  maxCardinality:   OWL + "maxCardinality",
+  exactCardinality: OWL + "cardinality",
 };
 
 const genId = () => crypto.randomUUID().slice(0, 8);
@@ -557,6 +562,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         labels: [],
         descriptions: [],
         subClassOf: [],
+        disjointWith: [],
         extraTriples: [],
       });
     } else if (type === P.objProp || type === P.dataProp || type === P.annotProp) {
@@ -603,6 +609,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         labels: [],
         descriptions: [],
         subClassOf: [],
+        disjointWith: [],
         extraTriples: [],
       });
     }
@@ -622,6 +629,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         labels: [],
         descriptions: [],
         subClassOf: [],
+        disjointWith: [],
         extraTriples: [],
       });
     }
@@ -693,8 +701,10 @@ export function buildModelFromTriples(parsed: ParseResult): {
         cls.descriptions.push({ value: t.o, lang: t.lang ?? "" });
       } else if (t.p === P.subClassOf && !t.isLiteral) {
         if (!cls.subClassOf.includes(t.o)) cls.subClassOf.push(t.o);
+      } else if (t.p === P.disjointWith && !t.isLiteral) {
+        if (!cls.disjointWith.includes(t.o)) cls.disjointWith.push(t.o);
       } else {
-        // Extra triple: prov:wasQuotedFrom, skos:*, dcterms:*, owl:disjointWith, etc.
+        // Extra triple: prov:wasQuotedFrom, skos:*, dcterms:*, etc.
         const extra: ExtraTriple = {
           predicate: t.p,
           object: t.o,
@@ -721,6 +731,17 @@ export function buildModelFromTriples(parsed: ParseResult): {
         prop.range = t.o;
       } else if (t.p === P.subPropertyOf && !t.isLiteral) {
         if (!prop.subPropertyOf.includes(t.o)) prop.subPropertyOf.push(t.o);
+      } else if (t.p === P.inverseOf && !t.isLiteral) {
+        prop.inverseOf = t.o;
+      } else if (t.p === P.minCardinality && t.isLiteral) {
+        const n = parseInt(t.o, 10);
+        if (!isNaN(n)) prop.minCardinality = n;
+      } else if (t.p === P.maxCardinality && t.isLiteral) {
+        const n = parseInt(t.o, 10);
+        if (!isNaN(n)) prop.maxCardinality = n;
+      } else if (t.p === P.exactCardinality && t.isLiteral) {
+        const n = parseInt(t.o, 10);
+        if (!isNaN(n)) prop.exactCardinality = n;
       } else {
         // Extra triple: any predicate not handled above
         const extra: ExtraTriple = {

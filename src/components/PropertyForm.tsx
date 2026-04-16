@@ -46,6 +46,10 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
   const [domainUri, setDomainUri] = useState(existing?.domainUri ?? defaultDomainUri ?? "");
   const [range, setRange] = useState(existing?.range ?? "");
   const [subPropertyOf, setSubPropertyOf] = useState<string[]>(existing?.subPropertyOf ?? []);
+  const [inverseOf, setInverseOf] = useState(existing?.inverseOf ?? "");
+  const [minCard, setMinCard] = useState(existing?.minCardinality !== undefined ? String(existing.minCardinality) : "");
+  const [maxCard, setMaxCard] = useState(existing?.maxCardinality !== undefined ? String(existing.maxCardinality) : "");
+  const [exactCard, setExactCard] = useState(existing?.exactCardinality !== undefined ? String(existing.exactCardinality) : "");
 
   // Extra triples — stored in compact/prefixed form for editing
   const [extraTriples, setExtraTriples] = useState<ExtraTriple[]>(
@@ -83,6 +87,8 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
         object: t.isLiteral ? t.object : expand(t.object, prefixes),
       }));
 
+    const parseCard = (s: string) => { const n = parseInt(s, 10); return isNaN(n) ? undefined : n; };
+    const exactCardVal = parseCard(exactCard);
     const data: Partial<OntologyProperty> = {
       localName: effectiveName,
       uri: uriValue || buildUri(baseUri, effectiveName),
@@ -92,6 +98,10 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
       domainUri,
       range,
       subPropertyOf,
+      inverseOf: inverseOf || undefined,
+      exactCardinality: exactCardVal,
+      minCardinality: exactCardVal !== undefined ? undefined : parseCard(minCard),
+      maxCardinality: exactCardVal !== undefined ? undefined : parseCard(maxCard),
       extraTriples: expandedTriples,
     };
 
@@ -303,6 +313,76 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
           </div>
         </div>
       )}
+
+      {/* owl:inverseOf — ObjectProperty only */}
+      {propType === "owl:ObjectProperty" && (
+        <div>
+          <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+            owl:inverseOf
+          </label>
+          <select
+            value={inverseOf}
+            onChange={(e) => setInverseOf(e.target.value)}
+            className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">(none)</option>
+            {allProperties
+              .filter((p) => p.type === "owl:ObjectProperty" && p.id !== existing?.id)
+              .map((p) => (
+                <option key={p.id} value={p.uri}>
+                  {p.labels[0]?.value || p.localName}
+                </option>
+              ))}
+          </select>
+        </div>
+      )}
+
+      {/* Cardinality */}
+      <div>
+        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          Cardinality
+        </label>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <span className="text-2xs text-th-fg-3">Exact</span>
+            <input
+              type="number"
+              min="0"
+              value={exactCard}
+              onChange={(e) => { setExactCard(e.target.value); if (e.target.value) { setMinCard(""); setMaxCard(""); } }}
+              placeholder="—"
+              className="w-14 rounded bg-th-input px-2 py-0.5 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          {!exactCard && (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-2xs text-th-fg-3">Min</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={minCard}
+                  onChange={(e) => setMinCard(e.target.value)}
+                  placeholder="—"
+                  className="w-14 rounded bg-th-input px-2 py-0.5 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-2xs text-th-fg-3">Max</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={maxCard}
+                  onChange={(e) => setMaxCard(e.target.value)}
+                  placeholder="—"
+                  className="w-14 rounded bg-th-input px-2 py-0.5 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </>
+          )}
+        </div>
+        <p className="mt-0.5 text-2xs text-th-fg-4">Simplified constraints — not OWL 2 restriction blank nodes</p>
+      </div>
 
       {/* Extra triples (prov:wasQuotedFrom, skos:*, etc.) */}
       <div>

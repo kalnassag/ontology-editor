@@ -149,6 +149,9 @@ export function serializeToTurtle(ontology: Ontology): string {
     for (const parentUri of cls.subClassOf) {
       pairs.push(["rdfs:subClassOf", c(parentUri)]);
     }
+    for (const disjUri of cls.disjointWith ?? []) {
+      pairs.push(["owl:disjointWith", c(disjUri)]);
+    }
     serializeExtraTriples(cls.extraTriples ?? [], pairs);
     const block = buildBlock(pairs);
     lines.push(`${c(cls.uri)} ${block[0]!}`);
@@ -175,6 +178,15 @@ export function serializeToTurtle(ontology: Ontology): string {
     if (prop.range) pairs.push(["rdfs:range", c(prop.range)]);
     for (const parentUri of prop.subPropertyOf) {
       pairs.push(["rdfs:subPropertyOf", c(parentUri)]);
+    }
+    if (prop.inverseOf) pairs.push(["owl:inverseOf", c(prop.inverseOf)]);
+    if (prop.exactCardinality !== undefined) {
+      pairs.push(["owl:cardinality", `"${prop.exactCardinality}"^^xsd:nonNegativeInteger`]);
+    } else {
+      if (prop.minCardinality !== undefined)
+        pairs.push(["owl:minCardinality", `"${prop.minCardinality}"^^xsd:nonNegativeInteger`]);
+      if (prop.maxCardinality !== undefined)
+        pairs.push(["owl:maxCardinality", `"${prop.maxCardinality}"^^xsd:nonNegativeInteger`]);
     }
     serializeExtraTriples(prop.extraTriples ?? [], pairs);
     const block = buildBlock(pairs);
