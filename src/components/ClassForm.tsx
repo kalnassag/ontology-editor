@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useStore } from "../lib/store";
-import { toPascalCase, compact, expand } from "../lib/uri-utils";
+import { toPascalCase, compact, expand, buildUri } from "../lib/uri-utils";
 import LabelEditor from "./LabelEditor";
 import ExtraTripleEditor from "./ExtraTripleEditor";
 import type { OntologyClass, LangString, ExtraTriple } from "../types";
@@ -21,6 +21,7 @@ export default function ClassForm({ existing, onDone }: Props) {
   const activeOntology = useStore((s) => s.getActiveOntology());
 
   const prefixes = activeOntology?.metadata.prefixes ?? {};
+  const baseUri = activeOntology?.metadata.baseUri ?? "";
 
   const [labels, setLabels] = useState<LangString[]>(
     existing?.labels?.length ? existing.labels : [{ value: "", lang: "" }]
@@ -30,6 +31,8 @@ export default function ClassForm({ existing, onDone }: Props) {
   );
   const [localName, setLocalName] = useState(existing?.localName ?? "");
   const [localNameManual, setLocalNameManual] = useState(!!existing);
+  // uriValue: "" means auto-compute from baseUri + localName; non-empty means explicit override
+  const [uriValue, setUriValue] = useState(existing?.uri ?? "");
   const [subClassOf, setSubClassOf] = useState<string[]>(existing?.subClassOf ?? []);
 
   // Extra triples — stored in compact/prefixed form for editing
@@ -51,6 +54,9 @@ export default function ClassForm({ existing, onDone }: Props) {
     ? localName
     : toPascalCase(labels[0]?.value ?? "");
 
+  const computedUri = buildUri(baseUri, derivedLocalName);
+  const effectiveUri = uriValue || computedUri;
+
   const handleSave = () => {
     const effectiveName = derivedLocalName.trim() || "UnnamedClass";
     const cleanLabels = labels.filter((l) => l.value.trim());
@@ -68,6 +74,7 @@ export default function ClassForm({ existing, onDone }: Props) {
     if (existing) {
       updateClass(existing.id, {
         localName: effectiveName,
+        uri: uriValue || buildUri(baseUri, effectiveName),
         labels: cleanLabels,
         descriptions: cleanDescs,
         subClassOf,
@@ -76,6 +83,7 @@ export default function ClassForm({ existing, onDone }: Props) {
     } else {
       addClass({
         localName: effectiveName,
+        uri: uriValue || buildUri(baseUri, effectiveName),
         labels: cleanLabels.length ? cleanLabels : [{ value: effectiveName, lang: "" }],
         descriptions: cleanDescs,
         subClassOf,
@@ -139,6 +147,28 @@ export default function ClassForm({ existing, onDone }: Props) {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Full URI */}
+      <div>
+        <label className="mb-1 flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          URI
+          {uriValue && uriValue !== computedUri && (
+            <button
+              onClick={() => setUriValue("")}
+              className="font-normal normal-case text-th-fg-4 hover:text-th-fg"
+              title="Reset to auto-computed URI"
+            >
+              reset
+            </button>
+          )}
+        </label>
+        <input
+          type="text"
+          value={effectiveUri}
+          onChange={(e) => setUriValue(e.target.value)}
+          className="w-full rounded bg-th-input px-2 py-1 font-mono text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
       </div>
 
       {/* subClassOf */}

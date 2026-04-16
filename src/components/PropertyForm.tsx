@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useStore } from "../lib/store";
-import { toCamelCase, XSD_TYPES, compact, expand } from "../lib/uri-utils";
+import { toCamelCase, XSD_TYPES, compact, expand, buildUri } from "../lib/uri-utils";
 import LabelEditor from "./LabelEditor";
 import ExtraTripleEditor from "./ExtraTripleEditor";
 import type { OntologyProperty, LangString, PropertyType, ExtraTriple } from "../types";
@@ -28,6 +28,7 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
   const activeOntology = useStore((s) => s.getActiveOntology());
 
   const prefixes = activeOntology?.metadata.prefixes ?? {};
+  const baseUri = activeOntology?.metadata.baseUri ?? "";
 
   const [labels, setLabels] = useState<LangString[]>(
     existing?.labels?.length ? existing.labels : [{ value: "", lang: "" }]
@@ -37,6 +38,8 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
   );
   const [localName, setLocalName] = useState(existing?.localName ?? "");
   const [localNameManual, setLocalNameManual] = useState(!!existing);
+  // uriValue: "" means auto-compute from baseUri + localName; non-empty means explicit override
+  const [uriValue, setUriValue] = useState(existing?.uri ?? "");
   const [propType, setPropType] = useState<PropertyType>(
     existing?.type ?? "owl:DatatypeProperty"
   );
@@ -63,6 +66,9 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
     ? localName
     : toCamelCase(labels[0]?.value ?? "");
 
+  const computedUri = buildUri(baseUri, derivedLocalName);
+  const effectiveUri = uriValue || computedUri;
+
   const handleSave = () => {
     const effectiveName = derivedLocalName.trim() || "unnamedProperty";
     const cleanLabels = labels.filter((l) => l.value.trim());
@@ -79,6 +85,7 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
 
     const data: Partial<OntologyProperty> = {
       localName: effectiveName,
+      uri: uriValue || buildUri(baseUri, effectiveName),
       type: propType,
       labels: cleanLabels.length ? cleanLabels : [{ value: effectiveName, lang: "" }],
       descriptions: cleanDescs,
@@ -175,6 +182,28 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
         </div>
       </div>
 
+      {/* Full URI */}
+      <div>
+        <label className="mb-1 flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+          URI
+          {uriValue && uriValue !== computedUri && (
+            <button
+              onClick={() => setUriValue("")}
+              className="font-normal normal-case text-th-fg-4 hover:text-th-fg"
+              title="Reset to auto-computed URI"
+            >
+              reset
+            </button>
+          )}
+        </label>
+        <input
+          type="text"
+          value={effectiveUri}
+          onChange={(e) => setUriValue(e.target.value)}
+          className="w-full rounded bg-th-input px-2 py-1 font-mono text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
       {/* Domain */}
       <div>
         <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
@@ -200,18 +229,30 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
           Range
         </label>
         {propType === "owl:ObjectProperty" ? (
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value)}
-            className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">(none)</option>
-            {allClasses.map((cls) => (
-              <option key={cls.id} value={cls.uri}>
-                {cls.labels[0]?.value || cls.localName}
-              </option>
-            ))}
-          </select>
+          <>
+            <input
+              list={`range-cls-${existing?.id ?? "new"}`}
+              type="text"
+              value={range}
+              onChange={(e) => setRange(e.target.value)}
+              placeholder="Class URI"
+              className="w-full rounded bg-th-input px-2 py-1 font-mono text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <datalist id={`range-cls-${existing?.id ?? "new"}`}>
+              {allClasses.map((cls) => (
+                <option
+                  key={cls.id}
+                  value={cls.uri}
+                  label={cls.labels[0]?.value || cls.localName}
+                />
+              ))}
+            </datalist>
+            {range && !allClasses.find((c) => c.uri === range) && (
+              <p className="mt-0.5 text-2xs text-amber-500">
+                Not in this ontology — will be saved as an external reference
+              </p>
+            )}
+          </>
         ) : propType === "owl:DatatypeProperty" ? (
           <select
             value={range}

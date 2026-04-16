@@ -407,10 +407,31 @@ export const useStore = create<EditorState>((set, get) => {
       set((s) => ({
         _history: [...s._history.slice(-49), s.ontologies],
         _future: [],
-        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
-          ...o,
-          classes: o.classes.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-        })),
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => {
+          const existing = o.classes.find((c) => c.id === id);
+          const oldUri = existing?.uri;
+          const newUri = patch.uri ?? oldUri;
+          const uriChanged = !!oldUri && !!newUri && oldUri !== newUri;
+          return {
+            ...o,
+            classes: o.classes.map((c) => {
+              if (c.id === id) return { ...c, ...patch };
+              // Cascade: update subClassOf refs pointing at the old URI
+              if (uriChanged && c.subClassOf.includes(oldUri!)) {
+                return { ...c, subClassOf: c.subClassOf.map((u) => (u === oldUri ? newUri! : u)) };
+              }
+              return c;
+            }),
+            // Cascade: update properties whose domain or range pointed at the old class URI
+            properties: uriChanged
+              ? o.properties.map((p) => ({
+                  ...p,
+                  domainUri: p.domainUri === oldUri ? newUri! : p.domainUri,
+                  range: p.range === oldUri ? newUri! : p.range,
+                }))
+              : o.properties,
+          };
+        }),
       }));
       persist();
     },
@@ -472,10 +493,23 @@ export const useStore = create<EditorState>((set, get) => {
       set((s) => ({
         _history: [...s._history.slice(-49), s.ontologies],
         _future: [],
-        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
-          ...o,
-          properties: o.properties.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-        })),
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => {
+          const existing = o.properties.find((p) => p.id === id);
+          const oldUri = existing?.uri;
+          const newUri = patch.uri ?? oldUri;
+          const uriChanged = !!oldUri && !!newUri && oldUri !== newUri;
+          return {
+            ...o,
+            properties: o.properties.map((p) => {
+              if (p.id === id) return { ...p, ...patch };
+              // Cascade: update subPropertyOf refs pointing at the old URI
+              if (uriChanged && p.subPropertyOf.includes(oldUri!)) {
+                return { ...p, subPropertyOf: p.subPropertyOf.map((u) => (u === oldUri ? newUri! : u)) };
+              }
+              return p;
+            }),
+          };
+        }),
       }));
       persist();
     },
