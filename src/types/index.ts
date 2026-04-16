@@ -151,6 +151,17 @@ export interface OntologyStore {
   canRedo: boolean;
 }
 
+// ── Clipboard Types ────────────────────────────────────────────────────
+
+/**
+ * What's currently on the internal clipboard.
+ * Persists in Zustand memory (not IndexedDB) — survives ontology switching
+ * within a session so classes/properties can be pasted into a different ontology.
+ */
+export type ClipboardItem =
+  | { type: "class"; cls: OntologyClass; properties: OntologyProperty[] }
+  | { type: "property"; property: OntologyProperty };
+
 // ── Parser Types ───────────────────────────────────────────────────────
 
 export interface ParsedTriple {
