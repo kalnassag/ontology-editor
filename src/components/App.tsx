@@ -15,8 +15,9 @@ import EntityGraph from "./EntityGraph";
 import IndividualCard from "./IndividualCard";
 import ValidationPanel from "./ValidationPanel";
 import ClassBrowserPanel from "./ClassBrowserPanel";
+import OntologyDiff from "./OntologyDiff";
 import { validate } from "../lib/validation";
-import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen, Clipboard, X } from "lucide-react";
+import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen, Clipboard, X, GitCompare } from "lucide-react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -33,7 +34,7 @@ function useTheme() {
   return { dark, toggle: () => setDark((d) => !d) };
 }
 
-type ViewMode = "classes" | "individuals" | "graph" | "entity-graph";
+type ViewMode = "classes" | "individuals" | "graph" | "entity-graph" | "diff";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -256,7 +257,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setViewMode("entity-graph")}
-                  className={`flex items-center gap-1 rounded-r border-l border-th-border-muted px-2 py-1 text-2xs font-medium ${
+                  className={`flex items-center gap-1 border-l border-th-border-muted px-2 py-1 text-2xs font-medium ${
                     viewMode === "entity-graph"
                       ? "bg-blue-600 text-white"
                       : "text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
@@ -266,10 +267,22 @@ export default function App() {
                   <Share2 size={12} />
                   Entities
                 </button>
+                <button
+                  onClick={() => setViewMode("diff")}
+                  className={`flex items-center gap-1 rounded-r border-l border-th-border-muted px-2 py-1 text-2xs font-medium ${
+                    viewMode === "diff"
+                      ? "bg-blue-600 text-white"
+                      : "text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
+                  }`}
+                  title="Diff / merge view"
+                >
+                  <GitCompare size={12} />
+                  Diff
+                </button>
               </div>
 
               {/* Expand/Collapse all (only in classes or individuals view) */}
-              {viewMode !== "graph" && viewMode !== "entity-graph" && (
+              {viewMode !== "graph" && viewMode !== "entity-graph" && viewMode !== "diff" && (
                 <button
                   onClick={toggleExpandAll}
                   className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
@@ -348,8 +361,12 @@ export default function App() {
               />
             )}
 
-            {/* Content: graph, entity-graph, classes, or individuals */}
-            {viewMode === "graph" ? (
+            {/* Content: graph, entity-graph, diff, classes, or individuals */}
+            {viewMode === "diff" ? (
+              <div className="relative flex-1 overflow-hidden">
+                <OntologyDiff />
+              </div>
+            ) : viewMode === "graph" ? (
               <div className="relative flex-1 overflow-hidden">
                 <OntologyGraph onClose={() => setViewMode("classes")} />
               </div>

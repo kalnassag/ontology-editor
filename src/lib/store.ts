@@ -265,9 +265,11 @@ export const useStore = create<EditorState>((set, get) => {
         if (!onto.individuals) onto.individuals = [];
         for (const cls of onto.classes) {
           if (!cls.extraTriples) cls.extraTriples = [];
+          if (!cls.disjointWith) cls.disjointWith = [];
         }
         for (const prop of onto.properties) {
           if (!prop.extraTriples) prop.extraTriples = [];
+          // inverseOf / cardinality are optional — undefined is fine, no migration needed
         }
       }
       set({
@@ -388,6 +390,7 @@ export const useStore = create<EditorState>((set, get) => {
         labels: partial.labels || [{ value: label, lang: onto.metadata.defaultLanguage }],
         descriptions: partial.descriptions || [{ value: "", lang: onto.metadata.defaultLanguage }],
         subClassOf: partial.subClassOf || [],
+        disjointWith: partial.disjointWith || [],
         extraTriples: partial.extraTriples || [],
       };
 
@@ -416,11 +419,12 @@ export const useStore = create<EditorState>((set, get) => {
             ...o,
             classes: o.classes.map((c) => {
               if (c.id === id) return { ...c, ...patch };
-              // Cascade: update subClassOf refs pointing at the old URI
-              if (uriChanged && c.subClassOf.includes(oldUri!)) {
-                return { ...c, subClassOf: c.subClassOf.map((u) => (u === oldUri ? newUri! : u)) };
-              }
-              return c;
+              if (!uriChanged) return c;
+              return {
+                ...c,
+                subClassOf: c.subClassOf.map((u) => (u === oldUri ? newUri! : u)),
+                disjointWith: (c.disjointWith ?? []).map((u) => (u === oldUri ? newUri! : u)),
+              };
             }),
             // Cascade: update properties whose domain or range pointed at the old class URI
             properties: uriChanged
@@ -444,7 +448,12 @@ export const useStore = create<EditorState>((set, get) => {
           const cls = o.classes.find((c) => c.id === id);
           return {
             ...o,
-            classes: o.classes.filter((c) => c.id !== id),
+            classes: o.classes
+              .filter((c) => c.id !== id)
+              .map((c) => ({
+                ...c,
+                disjointWith: (c.disjointWith ?? []).filter((u) => u !== cls?.uri),
+              })),
             properties: o.properties.map((p) =>
               cls && p.domainUri === cls.uri ? { ...p, domainUri: "" } : p
             ),
@@ -474,6 +483,10 @@ export const useStore = create<EditorState>((set, get) => {
         domainUri: partial.domainUri || "",
         range: partial.range || "",
         subPropertyOf: partial.subPropertyOf || [],
+        inverseOf: partial.inverseOf,
+        minCardinality: partial.minCardinality,
+        maxCardinality: partial.maxCardinality,
+        exactCardinality: partial.exactCardinality,
         extraTriples: partial.extraTriples || [],
       };
 
@@ -502,11 +515,12 @@ export const useStore = create<EditorState>((set, get) => {
             ...o,
             properties: o.properties.map((p) => {
               if (p.id === id) return { ...p, ...patch };
-              // Cascade: update subPropertyOf refs pointing at the old URI
-              if (uriChanged && p.subPropertyOf.includes(oldUri!)) {
-                return { ...p, subPropertyOf: p.subPropertyOf.map((u) => (u === oldUri ? newUri! : u)) };
-              }
-              return p;
+              if (!uriChanged) return p;
+              return {
+                ...p,
+                subPropertyOf: p.subPropertyOf.map((u) => (u === oldUri ? newUri! : u)),
+                inverseOf: p.inverseOf === oldUri ? newUri! : p.inverseOf,
+              };
             }),
           };
         }),
@@ -518,10 +532,18 @@ export const useStore = create<EditorState>((set, get) => {
       set((s) => ({
         _history: [...s._history.slice(-49), s.ontologies],
         _future: [],
-        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
-          ...o,
-          properties: o.properties.filter((p) => p.id !== id),
-        })),
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => {
+          const prop = o.properties.find((p) => p.id === id);
+          return {
+            ...o,
+            properties: o.properties
+              .filter((p) => p.id !== id)
+              .map((p) => ({
+                ...p,
+                inverseOf: p.inverseOf === prop?.uri ? undefined : p.inverseOf,
+              })),
+          };
+        }),
       }));
       persist();
     },

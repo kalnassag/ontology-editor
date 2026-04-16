@@ -100,6 +100,20 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
                 ))}
               </div>
             )}
+            {/* Disjoint classes */}
+            {(cls.disjointWith ?? []).length > 0 && (
+              <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                <span className="text-2xs text-red-400" title="owl:disjointWith">⊥</span>
+                {(cls.disjointWith ?? []).map((uri, i) => {
+                  const disjCls = allClasses.find((c) => c.uri === uri);
+                  return (
+                    <span key={i} className="rounded bg-red-950/40 px-1 text-2xs text-red-400">
+                      {disjCls?.labels[0]?.value || compact(uri, prefixes)}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             {/* Description */}
             {cls.descriptions[0]?.value && (
               <p className="mt-0.5 text-2xs leading-snug text-th-fg-3">

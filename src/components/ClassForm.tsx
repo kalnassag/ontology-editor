@@ -34,6 +34,7 @@ export default function ClassForm({ existing, onDone }: Props) {
   // uriValue: "" means auto-compute from baseUri + localName; non-empty means explicit override
   const [uriValue, setUriValue] = useState(existing?.uri ?? "");
   const [subClassOf, setSubClassOf] = useState<string[]>(existing?.subClassOf ?? []);
+  const [disjointWith, setDisjointWith] = useState<string[]>(existing?.disjointWith ?? []);
 
   // Extra triples — stored in compact/prefixed form for editing
   const [extraTriples, setExtraTriples] = useState<ExtraTriple[]>(
@@ -78,6 +79,7 @@ export default function ClassForm({ existing, onDone }: Props) {
         labels: cleanLabels,
         descriptions: cleanDescs,
         subClassOf,
+        disjointWith,
         extraTriples: expandedTriples,
       });
     } else {
@@ -87,6 +89,7 @@ export default function ClassForm({ existing, onDone }: Props) {
         labels: cleanLabels.length ? cleanLabels : [{ value: effectiveName, lang: "" }],
         descriptions: cleanDescs,
         subClassOf,
+        disjointWith,
         extraTriples: expandedTriples,
       });
     }
@@ -95,6 +98,12 @@ export default function ClassForm({ existing, onDone }: Props) {
 
   const toggleParent = (uri: string) => {
     setSubClassOf((prev) =>
+      prev.includes(uri) ? prev.filter((u) => u !== uri) : [...prev, uri]
+    );
+  };
+
+  const toggleDisjoint = (uri: string) => {
+    setDisjointWith((prev) =>
       prev.includes(uri) ? prev.filter((u) => u !== uri) : [...prev, uri]
     );
   };
@@ -187,6 +196,33 @@ export default function ClassForm({ existing, onDone }: Props) {
                   className={`rounded px-2 py-0.5 text-2xs ${
                     selected
                       ? "bg-blue-700 text-white"
+                      : "bg-th-hover text-th-fg-3 hover:bg-th-border"
+                  }`}
+                >
+                  {cls.labels[0]?.value || cls.localName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* owl:disjointWith */}
+      {parentOptions.length > 0 && (
+        <div>
+          <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+            owl:disjointWith
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {parentOptions.map((cls) => {
+              const selected = disjointWith.includes(cls.uri);
+              return (
+                <button
+                  key={cls.id}
+                  onClick={() => toggleDisjoint(cls.uri)}
+                  className={`rounded px-2 py-0.5 text-2xs ${
+                    selected
+                      ? "bg-red-700 text-white"
                       : "bg-th-hover text-th-fg-3 hover:bg-th-border"
                   }`}
                 >

@@ -21,6 +21,7 @@ const xsdUris = new Set(Object.values(XSD_TYPES));
 export function validate(ontology: Ontology): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const classUris = new Set(ontology.classes.map((c) => c.uri));
+  const propUris = new Set(ontology.properties.map((p) => p.uri));
   const allUris = new Map<string, string>(); // uri → entityId for duplicate detection
 
   // Ontology-level
@@ -65,6 +66,19 @@ export function validate(ontology: Ontology): ValidationIssue[] {
           entityType: "class",
           message: `rdfs:subClassOf references unknown class: ${parentUri}`,
           field: "subClassOf",
+        });
+      }
+    }
+
+    for (const disjUri of cls.disjointWith ?? []) {
+      if (cls.subClassOf.includes(disjUri)) {
+        const name = disjUri.split(/[#/]/).pop() ?? disjUri;
+        issues.push({
+          severity: "error",
+          entityId: cls.id,
+          entityType: "class",
+          message: `${cls.localName} is both rdfs:subClassOf and owl:disjointWith ${name} — contradiction`,
+          field: "disjointWith",
         });
       }
     }
@@ -130,6 +144,42 @@ export function validate(ontology: Ontology): ValidationIssue[] {
       });
     }
     allUris.set(prop.uri, prop.id);
+
+    if (prop.inverseOf && !propUris.has(prop.inverseOf)) {
+      issues.push({
+        severity: "warning",
+        entityId: prop.id,
+        entityType: "property",
+        message: `owl:inverseOf references unknown property: ${prop.inverseOf}`,
+        field: "inverseOf",
+      });
+    }
+
+    if (
+      prop.exactCardinality !== undefined &&
+      (prop.minCardinality !== undefined || prop.maxCardinality !== undefined)
+    ) {
+      issues.push({
+        severity: "warning",
+        entityId: prop.id,
+        entityType: "property",
+        message: `${prop.localName}: owl:cardinality conflicts with min/max cardinality`,
+        field: "exactCardinality",
+      });
+    }
+    if (
+      prop.minCardinality !== undefined &&
+      prop.maxCardinality !== undefined &&
+      prop.minCardinality > prop.maxCardinality
+    ) {
+      issues.push({
+        severity: "error",
+        entityId: prop.id,
+        entityType: "property",
+        message: `${prop.localName}: minCardinality (${prop.minCardinality}) > maxCardinality (${prop.maxCardinality})`,
+        field: "minCardinality",
+      });
+    }
   }
 
   return issues;

@@ -3,7 +3,7 @@
  */
 
 import { useRef, useState } from "react";
-import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle } from "lucide-react";
+import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle, Globe } from "lucide-react";
 import { useStore } from "../lib/store";
 import { supportsFileSystemAccess, openTurtleFile } from "../lib/file-access";
 
@@ -26,6 +26,10 @@ export default function OntologyList() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<NewOntologyForm>({ label: "", baseUri: "" });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [importingUrl, setImportingUrl] = useState(false);
+  const [urlValue, setUrlValue] = useState("");
+  const [urlError, setUrlError] = useState("");
+  const [urlLoading, setUrlLoading] = useState(false);
 
   const handleCreate = () => {
     if (!form.label.trim()) return;
@@ -53,6 +57,27 @@ export default function OntologyList() {
 
     // Fallback: classic <input type="file">
     fileRef.current?.click();
+  };
+
+  const handleUrlImport = async () => {
+    const url = urlValue.trim();
+    if (!url) return;
+    setUrlError("");
+    setUrlLoading(true);
+    try {
+      const response = await fetch(url, { headers: { Accept: "text/turtle, text/n3, application/x-turtle, */*" } });
+      if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      const text = await response.text();
+      const fileName = url.split("/").pop() || "imported.ttl";
+      importOntology(text, fileName);
+      setUrlValue("");
+      setImportingUrl(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setUrlError(msg.includes("Failed to fetch") ? `CORS error — the server at ${new URL(urlValue).hostname} does not allow cross-origin requests` : msg);
+    } finally {
+      setUrlLoading(false);
+    }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,6 +123,14 @@ export default function OntologyList() {
           <Upload size={12} />
           Import
         </button>
+        <button
+          onClick={() => { setImportingUrl((v) => !v); setUrlError(""); }}
+          className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
+          title="Import from URL"
+        >
+          <Globe size={12} />
+          URL
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -106,6 +139,39 @@ export default function OntologyList() {
           onChange={handleFileInputChange}
         />
       </div>
+
+      {/* URL import form */}
+      {importingUrl && (
+        <div className="border-b border-th-border-muted p-2 space-y-1.5">
+          <input
+            type="url"
+            placeholder="https://example.org/ontology.ttl"
+            value={urlValue}
+            onChange={(e) => { setUrlValue(e.target.value); setUrlError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleUrlImport(); if (e.key === "Escape") setImportingUrl(false); }}
+            autoFocus
+            className="w-full rounded bg-th-input px-2 py-1 font-mono text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {urlError && (
+            <p className="text-2xs text-red-400">{urlError}</p>
+          )}
+          <div className="flex gap-1">
+            <button
+              onClick={handleUrlImport}
+              disabled={urlLoading || !urlValue.trim()}
+              className="rounded bg-blue-600 px-2 py-0.5 text-2xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {urlLoading ? "Fetching…" : "Fetch & Import"}
+            </button>
+            <button
+              onClick={() => setImportingUrl(false)}
+              className="rounded bg-th-hover px-2 py-0.5 text-2xs text-th-fg-2 hover:bg-th-border"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* New ontology form */}
       {creating && (

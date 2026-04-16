@@ -25,7 +25,7 @@ interface Edge {
   source: string;
   target: string;
   label: string;
-  type: "subClassOf" | "objectProperty";
+  type: "subClassOf" | "objectProperty" | "inverseOf";
 }
 
 interface Props {
@@ -94,19 +94,38 @@ export default function OntologyGraph({ onClose }: Props) {
       }
     }
 
-    // ObjectProperty domain→range edges
+    // ObjectProperty domain→range edges — collapse inverse pairs into bidirectional edges
+    const seenInverse = new Set<string>();
     for (const prop of properties) {
-      if (prop.type === "owl:ObjectProperty" && prop.domainUri && prop.range) {
-        const domainCls = classes.find((c) => c.uri === prop.domainUri);
-        const rangeCls = classes.find((c) => c.uri === prop.range);
-        if (domainCls && rangeCls) {
-          newEdges.push({
-            source: domainCls.id,
-            target: rangeCls.id,
-            label: prop.labels[0]?.value || prop.localName,
-            type: "objectProperty",
-          });
-        }
+      if (prop.type !== "owl:ObjectProperty" || !prop.domainUri || !prop.range) continue;
+      const domainCls = classes.find((c) => c.uri === prop.domainUri);
+      const rangeCls = classes.find((c) => c.uri === prop.range);
+      if (!domainCls || !rangeCls) continue;
+
+      if (prop.inverseOf) {
+        const pairKey = [prop.uri, prop.inverseOf].sort().join("|");
+        if (seenInverse.has(pairKey)) continue;
+        seenInverse.add(pairKey);
+        const invProp = properties.find((p) => p.uri === prop.inverseOf);
+        const invLabel = invProp ? (invProp.labels[0]?.value || invProp.localName) : "inverse";
+        newEdges.push({
+          source: domainCls.id,
+          target: rangeCls.id,
+          label: `${prop.labels[0]?.value || prop.localName} ⇌ ${invLabel}`,
+          type: "inverseOf",
+        });
+      } else {
+        // Skip if this prop is the target of an already-rendered inverse pair
+        const alreadyRendered = properties.some(
+          (p) => p.inverseOf === prop.uri && seenInverse.has([p.uri, prop.uri].sort().join("|"))
+        );
+        if (alreadyRendered) continue;
+        newEdges.push({
+          source: domainCls.id,
+          target: rangeCls.id,
+          label: prop.labels[0]?.value || prop.localName,
+          type: "objectProperty",
+        });
       }
     }
 
@@ -239,7 +258,6 @@ export default function OntologyGraph({ onClose }: Props) {
     const s = getNodePos(edge.source);
     const t = getNodePos(edge.target);
 
-    // Count parallel edges between same pair
     const parallelEdges = edges.filter(
       (e) =>
         (e.source === edge.source && e.target === edge.target) ||
@@ -253,15 +271,18 @@ export default function OntologyGraph({ onClose }: Props) {
     const dx = t.x - s.x;
     const dy = t.y - s.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    // Perpendicular offset
     const px = -dy / len;
     const py = dx / len;
     const cx2 = mx + px * offset;
     const cy2 = my + py * offset;
 
-    const isSubClass = edge.type === "subClassOf";
-    const color = isSubClass ? "var(--th-fg-4)" : "#3b82f6";
-    const dash = isSubClass ? "6,3" : "none";
+    const color =
+      edge.type === "subClassOf" ? "var(--th-fg-4)"
+      : edge.type === "inverseOf" ? "#a855f7"
+      : "#3b82f6";
+    const dash = edge.type === "subClassOf" ? "6,3" : "none";
+    const markerEnd = edge.type === "subClassOf" ? "url(#arrow-sub)" : edge.type === "inverseOf" ? "url(#arrow-inv)" : "url(#arrow-obj)";
+    const markerStart = edge.type === "inverseOf" ? "url(#arrow-inv)" : undefined;
 
     return (
       <g key={`edge-${index}`}>
@@ -271,10 +292,10 @@ export default function OntologyGraph({ onClose }: Props) {
           stroke={color}
           strokeWidth={1.5}
           strokeDasharray={dash}
-          markerEnd={`url(#arrow-${isSubClass ? "sub" : "obj"})`}
+          markerEnd={markerEnd}
+          markerStart={markerStart}
           opacity={0.7}
         />
-        {/* Edge label */}
         <text
           x={cx2}
           y={cy2 - 6}
@@ -377,6 +398,10 @@ export default function OntologyGraph({ onClose }: Props) {
             <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke="#3b82f6" strokeWidth="1.5" /></svg>
             Object Property
           </span>
+          <span className="flex items-center gap-1">
+            <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke="#a855f7" strokeWidth="1.5" /></svg>
+            Inverse Pair
+          </span>
         </div>
 
         <div className="ml-auto flex items-center gap-1">
@@ -429,11 +454,13 @@ export default function OntologyGraph({ onClose }: Props) {
           style={{ cursor: dragging && "pan" in dragging ? "grabbing" : "default" }}
         >
           <defs>
-            {/* Arrowhead markers */}
             <marker id="arrow-sub" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" fill="var(--th-fg-4)">
               <path d="M 0 2 L 10 5 L 0 8 z" />
             </marker>
             <marker id="arrow-obj" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" fill="#3b82f6">
+              <path d="M 0 2 L 10 5 L 0 8 z" />
+            </marker>
+            <marker id="arrow-inv" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" fill="#a855f7">
               <path d="M 0 2 L 10 5 L 0 8 z" />
             </marker>
           </defs>
