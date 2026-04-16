@@ -7,7 +7,7 @@
  */
 
 import { create } from "zustand";
-import type { Ontology, OntologyClass, OntologyMetadata, OntologyProperty, Individual, IndividualPropertyValue } from "../types";
+import type { Ontology, OntologyClass, OntologyMetadata, OntologyProperty, Individual, IndividualPropertyValue, ClipboardItem } from "../types";
 import { loadAllOntologies, saveOntology, deleteOntology as dbDelete, debounce } from "./persistence";
 import { buildUri, toPascalCase, toCamelCase, STANDARD_PREFIXES } from "./uri-utils";
 import { parseTurtle, buildModelFromTriples } from "./turtle-parser";
@@ -89,6 +89,21 @@ interface EditorState {
   ) => void;
   removeIndividualProperty: (individualId: string, propertyIndex: number) => void;
 
+  // ── Clipboard ─────────────────────────────────────────────────────
+  clipboard: ClipboardItem | null;
+  /** Copy a class + all its domain properties into the clipboard. */
+  copyClass: (classId: string) => void;
+  /** Copy a single property into the clipboard. */
+  copyProperty: (propertyId: string) => void;
+  /**
+   * Paste the clipboard into the active ontology.
+   * For a class item: creates the class + its properties (new IDs, URIs rebased to target base).
+   * For a property item: creates the property (domainUri overridable via opts).
+   * Returns the new entity ID, or null if clipboard is empty.
+   */
+  pasteClipboard: (opts?: { domainUri?: string }) => string | null;
+  clearClipboard: () => void;
+
   // ── Export / Save ─────────────────────────────────────────────────
   exportTurtle: () => string;
   /** Save to the original file handle. If none, opens a "Save As" picker. */
@@ -169,6 +184,7 @@ export const useStore = create<EditorState>((set, get) => {
     _history: [],
     _future: [],
     importWarnings: [],
+    clipboard: null,
 
     // ── Derived ────────────────────────────────────────────────────────
     getActiveOntology: () => {
@@ -568,6 +584,119 @@ export const useStore = create<EditorState>((set, get) => {
       }));
       persist();
     },
+
+    // ── Clipboard ────────────────────────────────────────────────────────
+    copyClass: (classId) => {
+      const onto = get().getActiveOntology();
+      if (!onto) return;
+      const cls = onto.classes.find((c) => c.id === classId);
+      if (!cls) return;
+      const properties = onto.properties.filter((p) => p.domainUri === cls.uri);
+      set({ clipboard: { type: "class", cls, properties } });
+    },
+
+    copyProperty: (propertyId) => {
+      const onto = get().getActiveOntology();
+      if (!onto) return;
+      const property = onto.properties.find((p) => p.id === propertyId);
+      if (!property) return;
+      set({ clipboard: { type: "property", property } });
+    },
+
+    pasteClipboard: (opts) => {
+      const onto = get().getActiveOntology();
+      if (!onto) return null;
+      const item = get().clipboard;
+      if (!item) return null;
+
+      // Build a set of URIs already in the target ontology for collision detection.
+      const existingUris = new Set([
+        ...onto.classes.map((c) => c.uri),
+        ...onto.properties.map((p) => p.uri),
+      ]);
+
+      /** Return a local name + URI that don't collide in the target ontology. */
+      function rebase(srcLocalName: string): { localName: string; uri: string } {
+        let candidate = srcLocalName;
+        let uri = buildUri(onto!.metadata.baseUri, candidate);
+        if (!existingUris.has(uri)) return { localName: candidate, uri };
+        let counter = 1;
+        do {
+          candidate = `${srcLocalName}_copy${counter > 1 ? counter : ""}`;
+          uri = buildUri(onto!.metadata.baseUri, candidate);
+          counter++;
+        } while (existingUris.has(uri));
+        return { localName: candidate, uri };
+      }
+
+      if (item.type === "class") {
+        const { cls, properties } = item;
+        const newClassId = genId();
+        const { localName: newLocalName, uri: newUri } = rebase(cls.localName);
+        existingUris.add(newUri);
+
+        const newCls: OntologyClass = {
+          ...cls,
+          id: newClassId,
+          localName: newLocalName,
+          uri: newUri,
+        };
+
+        const newProperties: OntologyProperty[] = properties.map((prop) => {
+          const { localName: pLocal, uri: pUri } = rebase(prop.localName);
+          existingUris.add(pUri);
+          return {
+            ...prop,
+            id: genId(),
+            localName: pLocal,
+            uri: pUri,
+            domainUri: newUri, // remap domain to the new class URI
+          };
+        });
+
+        set((s) => ({
+          _history: [...s._history.slice(-49), s.ontologies],
+          _future: [],
+          ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
+            ...o,
+            classes: [...o.classes, newCls],
+            properties: [...o.properties, ...newProperties],
+          })),
+        }));
+        persist();
+        return newClassId;
+      }
+
+      if (item.type === "property") {
+        const { property } = item;
+        const { localName: pLocal, uri: pUri } = rebase(property.localName);
+        const domainUri =
+          opts?.domainUri !== undefined ? opts.domainUri : property.domainUri;
+
+        const newProp: OntologyProperty = {
+          ...property,
+          id: genId(),
+          localName: pLocal,
+          uri: pUri,
+          domainUri,
+        };
+
+        set((s) => ({
+          _history: [...s._history.slice(-49), s.ontologies],
+          _future: [],
+          ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => ({
+            ...o,
+            properties: [...o.properties, newProp],
+          })),
+        }));
+        persist();
+        return newProp.id;
+      }
+
+      return null;
+    },
+
+    clearClipboard: () => set({ clipboard: null }),
 
     // ── Export / Save ────────────────────────────────────────────────────
     exportTurtle: () => {

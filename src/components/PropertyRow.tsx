@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Clipboard } from "lucide-react";
 import { useStore } from "../lib/store";
 import { compact } from "../lib/uri-utils";
 import PropertyForm from "./PropertyForm";
@@ -22,6 +22,7 @@ const TYPE_BADGE: Record<OntologyProperty["type"], { label: string; className: s
 
 export default function PropertyRow({ property }: Props) {
   const deleteProperty = useStore((s) => s.deleteProperty);
+  const copyProperty = useStore((s) => s.copyProperty);
   const activeOntology = useStore((s) => s.getActiveOntology());
   const [editing, setEditing] = useState(false);
 
@@ -88,6 +89,13 @@ export default function PropertyRow({ property }: Props) {
 
       {/* Actions (shown on hover) */}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+        <button
+          onClick={() => copyProperty(property.id)}
+          className="rounded p-1 text-th-fg-4 hover:text-purple-400"
+          title="Copy property"
+        >
+          <Clipboard size={11} />
+        </button>
         <button
           onClick={() => setEditing(true)}
           className="rounded p-1 text-th-fg-4 hover:text-th-fg-2"

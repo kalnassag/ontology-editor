@@ -16,7 +16,7 @@ import IndividualCard from "./IndividualCard";
 import ValidationPanel from "./ValidationPanel";
 import ClassBrowserPanel from "./ClassBrowserPanel";
 import { validate } from "../lib/validation";
-import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen, Clipboard, X } from "lucide-react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -43,6 +43,9 @@ export default function App() {
   const redo = useStore((s) => s.redo);
   const canUndo = useStore((s) => s.canUndo);
   const canRedo = useStore((s) => s.canRedo);
+  const clipboard = useStore((s) => s.clipboard);
+  const pasteClipboard = useStore((s) => s.pasteClipboard);
+  const clearClipboard = useStore((s) => s.clearClipboard);
   const [addingClass, setAddingClass] = useState(false);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("classes");
@@ -83,11 +86,19 @@ export default function App() {
           setAddingClass(true);
           setViewMode("classes");
         }
+      } else if (e.key === "v") {
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+          if (clipboard) {
+            e.preventDefault();
+            pasteClipboard();
+            setViewMode("classes");
+          }
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, canUndo, canRedo]);
+  }, [undo, redo, canUndo, canRedo, clipboard, pasteClipboard]);
 
   const toggleExpandAll = useCallback(() => {
     setAllExpanded((prev) => {
@@ -288,6 +299,29 @@ export default function App() {
                   ↪
                 </button>
               </div>
+
+              {/* Clipboard indicator + paste */}
+              {clipboard && (
+                <div className="flex items-center gap-0.5 rounded border border-purple-700/50 bg-purple-950/40 pl-1.5 pr-0.5 py-0.5">
+                  <button
+                    onClick={() => { pasteClipboard(); setViewMode("classes"); }}
+                    className="flex items-center gap-1 text-2xs text-purple-300 hover:text-purple-200"
+                    title="Paste (Ctrl+V)"
+                  >
+                    <Clipboard size={11} />
+                    {clipboard.type === "class"
+                      ? `${clipboard.cls.labels[0]?.value || clipboard.cls.localName}${clipboard.properties.length > 0 ? ` +${clipboard.properties.length}` : ""}`
+                      : (clipboard.property.labels[0]?.value || clipboard.property.localName)}
+                  </button>
+                  <button
+                    onClick={clearClipboard}
+                    className="ml-0.5 rounded p-0.5 text-purple-500 hover:text-purple-300"
+                    title="Clear clipboard"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              )}
 
               {/* Validate */}
               <button

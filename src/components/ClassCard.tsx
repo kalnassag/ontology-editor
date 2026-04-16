@@ -5,7 +5,7 @@ import PropertyRow from './PropertyRow';
 import ClassForm from './ClassForm';
 import PropertyForm from './PropertyForm';
 import type { OntologyClass } from '../types';
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Clipboard } from 'lucide-react';
 
 interface Props {
   cls: OntologyClass;
@@ -32,6 +32,9 @@ const TYPE_COLOR: Record<string, string> = {
 
 export default function ClassCard({ cls, defaultExpanded = true }: Props) {
   const deleteClass = useStore((s) => s.deleteClass);
+  const copyClass = useStore((s) => s.copyClass);
+  const pasteClipboard = useStore((s) => s.pasteClipboard);
+  const clipboard = useStore((s) => s.clipboard);
   const getPropertiesByDomain = useStore((s) => s.getPropertiesByDomain);
   const activeOntology = useStore((s) => s.getActiveOntology());
 
@@ -115,6 +118,13 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
               <Plus size={13} />
             </button>
             <button
+              onClick={() => copyClass(cls.id)}
+              className="rounded p-1 text-th-fg-4 hover:text-purple-400"
+              title={`Copy class${properties.length > 0 ? ` + ${properties.length} propert${properties.length === 1 ? 'y' : 'ies'}` : ''}`}
+            >
+              <Clipboard size={12} />
+            </button>
+            <button
               onClick={() => setEditingClass(true)}
               className="rounded p-1 text-th-fg-4 hover:text-th-fg-2"
               title="Edit class"
@@ -192,13 +202,25 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
               />
             </div>
           ) : (
-            <button
-              onClick={() => setAddingProperty(true)}
-              className="ml-3 mt-1 flex items-center gap-1 text-2xs text-th-fg-4 hover:text-blue-400"
-            >
-              <Plus size={11} />
-              Add property
-            </button>
+            <div className="ml-3 mt-1 flex items-center gap-2">
+              <button
+                onClick={() => setAddingProperty(true)}
+                className="flex items-center gap-1 text-2xs text-th-fg-4 hover:text-blue-400"
+              >
+                <Plus size={11} />
+                Add property
+              </button>
+              {clipboard?.type === "property" && (
+                <button
+                  onClick={() => pasteClipboard({ domainUri: cls.uri })}
+                  className="flex items-center gap-1 text-2xs text-purple-500 hover:text-purple-400"
+                  title={`Paste "${clipboard.property.labels[0]?.value || clipboard.property.localName}" into this class`}
+                >
+                  <Clipboard size={11} />
+                  Paste property
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
