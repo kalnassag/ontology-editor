@@ -153,8 +153,8 @@ export default function EntityGraph() {
       }
     }
 
-    const w = 1200;
-    const h = 800;
+    const w = Math.max(1600, 280 * Math.sqrt(newNodes.length));
+    const h = Math.max(1000, 220 * Math.sqrt(newNodes.length));
     computeLayout(newNodes, newEdges, w, h);
 
     // Preserve manual drag positions for existing nodes

@@ -40,9 +40,15 @@ export default function OntologyGraph({ onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Pan/zoom state
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 1200, h: 800 });
-  const [dragging, setDragging] = useState<{ nodeId: string } | { pan: true; startX: number; startY: number; startVB: typeof viewBox } | null>(null);
+  type ViewBox = { x: number; y: number; w: number; h: number };
+  const [viewBox, setViewBox] = useState<ViewBox>({ x: 0, y: 0, w: 1600, h: 1000 });
+  const [dragging, setDragging] = useState<{ nodeId: string } | { pan: true; startX: number; startY: number; startVB: ViewBox } | null>(null);
   const [dragNodePos, setDragNodePos] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  // rAF-throttled drag updates — avoids a full re-render on every mousemove
+  const rafRef = useRef<number | null>(null);
+  const pendingDragPos = useRef<{ id: string; x: number; y: number } | null>(null);
+  const pendingViewBox = useRef<ViewBox | null>(null);
 
   // Build nodes & edges from ontology
   const classes = activeOntology?.classes ?? [];
@@ -129,8 +135,8 @@ export default function OntologyGraph({ onClose }: Props) {
       }
     }
 
-    const w = 1200;
-    const h = 800;
+    const w = Math.max(1600, 280 * Math.sqrt(classes.length));
+    const h = Math.max(1000, 220 * Math.sqrt(classes.length));
     computeLayout(newNodes, newEdges, w, h);
     setNodes(newNodes);
     setEdges(newEdges);
@@ -205,27 +211,54 @@ export default function OntologyGraph({ onClose }: Props) {
     }
   };
 
+  const flushPending = useCallback(() => {
+    rafRef.current = null;
+    if (pendingDragPos.current) {
+      setDragNodePos(pendingDragPos.current);
+      pendingDragPos.current = null;
+    }
+    if (pendingViewBox.current) {
+      setViewBox(pendingViewBox.current);
+      pendingViewBox.current = null;
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(flushPending);
+  }, [flushPending]);
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!dragging) return;
     if ("pan" in dragging) {
       const dx = (e.clientX - dragging.startX) / (containerRef.current?.clientWidth ?? 1) * dragging.startVB.w;
       const dy = (e.clientY - dragging.startY) / (containerRef.current?.clientHeight ?? 1) * dragging.startVB.h;
-      setViewBox({
+      pendingViewBox.current = {
         ...dragging.startVB,
         x: dragging.startVB.x - dx,
         y: dragging.startVB.y - dy,
-      });
+      };
+      scheduleFlush();
     } else if ("nodeId" in dragging) {
       const pt = svgPoint(e.clientX, e.clientY);
-      setDragNodePos({ id: dragging.nodeId, x: pt.x, y: pt.y });
+      pendingDragPos.current = { id: dragging.nodeId, x: pt.x, y: pt.y };
+      scheduleFlush();
     }
   };
 
   const handleMouseUp = () => {
-    if (dragging && "nodeId" in dragging && dragNodePos) {
+    // Flush any in-flight rAF so the final position below is the latest
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    const finalPos = pendingDragPos.current ?? dragNodePos;
+    pendingDragPos.current = null;
+    pendingViewBox.current = null;
+    if (dragging && "nodeId" in dragging && finalPos) {
       setNodes((prev) =>
         prev.map((n) =>
-          n.id === dragNodePos.id ? { ...n, x: dragNodePos.x, y: dragNodePos.y } : n
+          n.id === finalPos.id ? { ...n, x: finalPos.x, y: finalPos.y } : n
         )
       );
       setDragNodePos(null);
@@ -276,6 +309,10 @@ export default function OntologyGraph({ onClose }: Props) {
     const cx2 = mx + px * offset;
     const cy2 = my + py * offset;
 
+    // Bezier midpoint (t=0.5) is a better label anchor than the control point
+    const lx = 0.25 * s.x + 0.5 * cx2 + 0.25 * t.x;
+    const ly = 0.25 * s.y + 0.5 * cy2 + 0.25 * t.y;
+
     const color =
       edge.type === "subClassOf" ? "var(--th-fg-4)"
       : edge.type === "inverseOf" ? "#a855f7"
@@ -283,6 +320,42 @@ export default function OntologyGraph({ onClose }: Props) {
     const dash = edge.type === "subClassOf" ? "6,3" : "none";
     const markerEnd = edge.type === "subClassOf" ? "url(#arrow-sub)" : edge.type === "inverseOf" ? "url(#arrow-inv)" : "url(#arrow-obj)";
     const markerStart = edge.type === "inverseOf" ? "url(#arrow-inv)" : undefined;
+
+    const trunc = (s: string, max: number) => s.length > max ? s.slice(0, max - 1) + "…" : s;
+    const FONT = "IBM Plex Sans, sans-serif";
+
+    let labelEl: React.ReactNode;
+    if (edge.type === "inverseOf") {
+      const parts = edge.label.split(" ⇌ ");
+      const fwd = trunc(parts[0] ?? "", 15);
+      const inv = trunc(parts[1] ?? "", 15);
+      const maxChars = Math.max(fwd.length, inv.length + 2);
+      const bgW = maxChars * 5.2 + 12;
+      const bgH = 27;
+      labelEl = (
+        <g>
+          <rect x={lx - bgW / 2} y={ly - bgH / 2} width={bgW} height={bgH} rx={3}
+            fill="var(--th-surface)" stroke="#a855f7" strokeWidth={0.5} opacity={0.95} />
+          <text textAnchor="middle" fill={color} fontSize={9} fontFamily={FONT} fontWeight={500}>
+            <tspan x={lx} y={ly - 4}>{fwd}</tspan>
+            <tspan x={lx} dy={12}>⇌ {inv}</tspan>
+          </text>
+        </g>
+      );
+    } else {
+      const lbl = trunc(edge.label, 20);
+      const bgW = lbl.length * 5.2 + 10;
+      const bgH = 14;
+      labelEl = (
+        <g>
+          <rect x={lx - bgW / 2} y={ly - bgH} width={bgW} height={bgH} rx={3}
+            fill="var(--th-surface)" opacity={0.85} />
+          <text x={lx} y={ly - 4} textAnchor="middle" fill={color} fontSize={9} fontFamily={FONT}>
+            {lbl}
+          </text>
+        </g>
+      );
+    }
 
     return (
       <g key={`edge-${index}`}>
@@ -296,17 +369,7 @@ export default function OntologyGraph({ onClose }: Props) {
           markerStart={markerStart}
           opacity={0.7}
         />
-        <text
-          x={cx2}
-          y={cy2 - 6}
-          textAnchor="middle"
-          fill={color}
-          fontSize={10}
-          fontFamily="IBM Plex Sans, sans-serif"
-          opacity={0.9}
-        >
-          {edge.label}
-        </text>
+        {labelEl}
       </g>
     );
   };
