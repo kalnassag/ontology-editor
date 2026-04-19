@@ -40,9 +40,15 @@ export default function OntologyGraph({ onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Pan/zoom state
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 1200, h: 800 });
-  const [dragging, setDragging] = useState<{ nodeId: string } | { pan: true; startX: number; startY: number; startVB: typeof viewBox } | null>(null);
+  type ViewBox = { x: number; y: number; w: number; h: number };
+  const [viewBox, setViewBox] = useState<ViewBox>({ x: 0, y: 0, w: 1600, h: 1000 });
+  const [dragging, setDragging] = useState<{ nodeId: string } | { pan: true; startX: number; startY: number; startVB: ViewBox } | null>(null);
   const [dragNodePos, setDragNodePos] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  // rAF-throttled drag updates — avoids a full re-render on every mousemove
+  const rafRef = useRef<number | null>(null);
+  const pendingDragPos = useRef<{ id: string; x: number; y: number } | null>(null);
+  const pendingViewBox = useRef<ViewBox | null>(null);
 
   // Build nodes & edges from ontology
   const classes = activeOntology?.classes ?? [];
@@ -129,8 +135,8 @@ export default function OntologyGraph({ onClose }: Props) {
       }
     }
 
-    const w = 1200;
-    const h = 800;
+    const w = Math.max(1600, 280 * Math.sqrt(classes.length));
+    const h = Math.max(1000, 220 * Math.sqrt(classes.length));
     computeLayout(newNodes, newEdges, w, h);
     setNodes(newNodes);
     setEdges(newEdges);
@@ -205,27 +211,54 @@ export default function OntologyGraph({ onClose }: Props) {
     }
   };
 
+  const flushPending = useCallback(() => {
+    rafRef.current = null;
+    if (pendingDragPos.current) {
+      setDragNodePos(pendingDragPos.current);
+      pendingDragPos.current = null;
+    }
+    if (pendingViewBox.current) {
+      setViewBox(pendingViewBox.current);
+      pendingViewBox.current = null;
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(flushPending);
+  }, [flushPending]);
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!dragging) return;
     if ("pan" in dragging) {
       const dx = (e.clientX - dragging.startX) / (containerRef.current?.clientWidth ?? 1) * dragging.startVB.w;
       const dy = (e.clientY - dragging.startY) / (containerRef.current?.clientHeight ?? 1) * dragging.startVB.h;
-      setViewBox({
+      pendingViewBox.current = {
         ...dragging.startVB,
         x: dragging.startVB.x - dx,
         y: dragging.startVB.y - dy,
-      });
+      };
+      scheduleFlush();
     } else if ("nodeId" in dragging) {
       const pt = svgPoint(e.clientX, e.clientY);
-      setDragNodePos({ id: dragging.nodeId, x: pt.x, y: pt.y });
+      pendingDragPos.current = { id: dragging.nodeId, x: pt.x, y: pt.y };
+      scheduleFlush();
     }
   };
 
   const handleMouseUp = () => {
-    if (dragging && "nodeId" in dragging && dragNodePos) {
+    // Flush any in-flight rAF so the final position below is the latest
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    const finalPos = pendingDragPos.current ?? dragNodePos;
+    pendingDragPos.current = null;
+    pendingViewBox.current = null;
+    if (dragging && "nodeId" in dragging && finalPos) {
       setNodes((prev) =>
         prev.map((n) =>
-          n.id === dragNodePos.id ? { ...n, x: dragNodePos.x, y: dragNodePos.y } : n
+          n.id === finalPos.id ? { ...n, x: finalPos.x, y: finalPos.y } : n
         )
       );
       setDragNodePos(null);
