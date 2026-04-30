@@ -79,7 +79,7 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
         <div className="group flex min-w-0 flex-1 items-start gap-2 py-1.5 pr-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold text-th-fg">{primaryLabel}</span>
+              <span className="text-base font-semibold text-th-fg">{primaryLabel}</span>
               {/* Additional labels */}
               {allLabels.slice(1).map((lbl, i) => (
                 <span key={i} className="text-xs text-th-fg-3">
@@ -87,7 +87,7 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
                 </span>
               ))}
               {/* URI on hover */}
-              <span className="hidden font-mono text-2xs text-th-fg-4 group-hover:inline">
+              <span className="hidden font-mono text-xs text-th-fg-4 group-hover:inline">
                 {compact(cls.uri, prefixes)}
               </span>
             </div>

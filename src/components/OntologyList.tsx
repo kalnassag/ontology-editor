@@ -3,9 +3,10 @@
  */
 
 import { useRef, useState } from "react";
-import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle, Globe } from "lucide-react";
+import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle, Globe, BookOpen, Check } from "lucide-react";
 import { useStore } from "../lib/store";
 import { supportsFileSystemAccess, openTurtleFile } from "../lib/file-access";
+import { COMMON_ONTOLOGIES } from "../lib/common-ontologies";
 
 interface NewOntologyForm {
   label: string;
@@ -30,6 +31,8 @@ export default function OntologyList() {
   const [urlValue, setUrlValue] = useState("");
   const [urlError, setUrlError] = useState("");
   const [urlLoading, setUrlLoading] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [loadedLibraryIds, setLoadedLibraryIds] = useState<Set<string>>(new Set());
 
   const handleCreate = () => {
     if (!form.label.trim()) return;
@@ -124,6 +127,14 @@ export default function OntologyList() {
           Import
         </button>
         <button
+          onClick={() => { setShowLibrary((v) => !v); setImportingUrl(false); }}
+          className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
+          title="Common ontology library"
+        >
+          <BookOpen size={12} />
+          Library
+        </button>
+        <button
           onClick={() => { setImportingUrl((v) => !v); setUrlError(""); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
           title="Import from URL"
@@ -207,6 +218,41 @@ export default function OntologyList() {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Common ontology library */}
+      {showLibrary && (
+        <div className="border-b border-th-border-muted bg-th-base">
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-th-fg-3">Common Ontologies</span>
+            <button onClick={() => setShowLibrary(false)} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={11} /></button>
+          </div>
+          {COMMON_ONTOLOGIES.map((onto) => (
+            <div key={onto.id} className="border-t border-th-border-muted px-2 py-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-th-fg">{onto.name}</div>
+                  <div className="text-2xs text-th-fg-4 leading-snug mt-0.5">{onto.description}</div>
+                </div>
+                {loadedLibraryIds.has(onto.id) ? (
+                  <span className="flex flex-shrink-0 items-center gap-1 text-2xs text-green-400">
+                    <Check size={11} /> Loaded
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      importOntology(onto.turtle, `${onto.id}.ttl`);
+                      setLoadedLibraryIds((prev) => new Set([...prev, onto.id]));
+                    }}
+                    className="flex-shrink-0 rounded bg-blue-700 px-2 py-0.5 text-2xs font-medium text-white hover:bg-blue-600"
+                  >
+                    Load
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
