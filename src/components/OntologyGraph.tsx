@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { computeLayout } from "../lib/graph-utils";
+import ClassForm from "./ClassForm";
 import type { OntologyClass } from "../types";
 
 interface Node {
@@ -57,6 +58,8 @@ export default function OntologyGraph({ onClose }: Props) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [editPanelPos, setEditPanelPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     if (classes.length === 0) return;
@@ -209,6 +212,28 @@ export default function OntologyGraph({ onClose }: Props) {
       setDragging({ pan: true, startX: e.clientX, startY: e.clientY, startVB: { ...viewBox } });
       e.preventDefault();
     }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    const target = e.target as SVGElement;
+    const nodeId = target.closest("[data-node-id]")?.getAttribute("data-node-id");
+    if (!nodeId) return;
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    // Convert SVG node position to container-relative screen position
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const screenX = ((node.x - viewBox.x) / viewBox.w) * rect.width;
+    const screenY = ((node.y - viewBox.y) / viewBox.h) * rect.height;
+    // Clamp so panel stays inside the container
+    const panelW = 360;
+    const panelH = 480;
+    setEditPanelPos({
+      x: Math.min(Math.max(screenX + 20, 8), rect.width - panelW - 8),
+      y: Math.min(Math.max(screenY - 40, 40), rect.height - panelH - 8),
+    });
+    setEditingClassId(nodeId);
   };
 
   const flushPending = useCallback(() => {
@@ -514,6 +539,7 @@ export default function OntologyGraph({ onClose }: Props) {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
+          onDoubleClick={handleDoubleClick}
           style={{ cursor: dragging && "pan" in dragging ? "grabbing" : "default" }}
         >
           <defs>
@@ -557,6 +583,26 @@ export default function OntologyGraph({ onClose }: Props) {
           })()}
         </div>
       )}
+
+      {/* Floating class edit panel — opened by double-clicking a node */}
+      {editingClassId && (() => {
+        const cls = classes.find((c) => c.id === editingClassId);
+        if (!cls) return null;
+        return (
+          <div
+            style={{ position: "absolute", left: editPanelPos.x, top: editPanelPos.y, width: 360, zIndex: 50 }}
+            className="rounded border border-th-border shadow-2xl"
+          >
+            <div className="flex items-center justify-between rounded-t border-b border-th-border-muted bg-th-surface px-3 py-1.5">
+              <span className="text-xs font-semibold text-th-fg">Edit: {cls.labels[0]?.value || cls.localName}</span>
+              <button onClick={() => setEditingClassId(null)} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
+            </div>
+            <div className="max-h-[440px] overflow-y-auto">
+              <ClassForm existing={cls} onDone={() => setEditingClassId(null)} />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

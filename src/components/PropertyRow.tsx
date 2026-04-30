@@ -53,13 +53,13 @@ export default function PropertyRow({ property }: Props) {
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-xs font-medium text-th-fg">{primaryLabel}</span>
+          <span className="text-sm font-medium text-th-fg">{primaryLabel}</span>
           {rangeLabel && (
-            <span className="font-mono text-2xs text-th-fg-3">{rangeLabel}</span>
+            <span className="font-mono text-xs text-th-fg-3">{rangeLabel}</span>
           )}
         </div>
         {description && (
-          <p className="mt-0.5 text-2xs leading-snug text-th-fg-3">{description}</p>
+          <p className="mt-0.5 text-xs leading-snug text-th-fg-3">{description}</p>
         )}
         {/* Additional labels */}
         {property.labels.length > 1 && (

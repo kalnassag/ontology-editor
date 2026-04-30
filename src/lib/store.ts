@@ -77,6 +77,7 @@ interface EditorState {
 
   // ── Individual actions ──────────────────────────────────────────────
   addIndividual: (label: string, typeUri: string) => string;
+  updateIndividual: (id: string, patch: { localName?: string; uri?: string; typeUris?: string[] }) => void;
   deleteIndividual: (id: string) => void;
   updateIndividualProperty: (
     individualId: string,
@@ -575,6 +576,34 @@ export const useStore = create<EditorState>((set, get) => {
       }));
       persist();
       return id;
+    },
+
+    updateIndividual: (id, patch) => {
+      set((s) => ({
+        _history: [...s._history.slice(-49), s.ontologies],
+        _future: [],
+        ontologies: updateActive(s.ontologies, s.activeOntologyId, (o) => {
+          const oldUri = o.individuals.find((i) => i.id === id)?.uri;
+          const updated = o.individuals.map((ind) =>
+            ind.id === id ? { ...ind, ...patch } : ind
+          );
+          const newUri = updated.find((i) => i.id === id)?.uri;
+          // Cascade URI rename into other individuals' object-property values
+          if (oldUri && newUri && oldUri !== newUri) {
+            return {
+              ...o,
+              individuals: updated.map((ind) => ({
+                ...ind,
+                propertyValues: ind.propertyValues.map((pv) =>
+                  !pv.isLiteral && pv.value === oldUri ? { ...pv, value: newUri } : pv
+                ),
+              })),
+            };
+          }
+          return { ...o, individuals: updated };
+        }),
+      }));
+      persist();
     },
 
     deleteIndividual: (id) => {
