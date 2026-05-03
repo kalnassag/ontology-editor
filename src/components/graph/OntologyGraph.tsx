@@ -16,9 +16,9 @@ import {
   type SimulationNodeDatum,
 } from "d3-force";
 import { X, ZoomIn, ZoomOut, Maximize2, RefreshCw } from "lucide-react";
-import { useStore } from "../lib/store";
-import { compact } from "../lib/uri-utils";
-import ClassForm from "./ClassForm";
+import { useStore } from "../../lib/store";
+import { compact } from "../../lib/uri-utils";
+import ClassForm from "../forms/ClassForm";
 
 // ── VOWL palette ──────────────────────────────────────────────────
 const V = {

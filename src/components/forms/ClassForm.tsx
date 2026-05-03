@@ -3,11 +3,11 @@
  */
 
 import { useState } from "react";
-import { useStore } from "../lib/store";
-import { toPascalCase, compact, expand, buildUri } from "../lib/uri-utils";
+import { useStore } from "../../lib/store";
+import { toPascalCase, compact, expand, buildUri } from "../../lib/uri-utils";
 import LabelEditor from "./LabelEditor";
 import ExtraTripleEditor from "./ExtraTripleEditor";
-import type { OntologyClass, LangString, ExtraTriple } from "../types";
+import type { OntologyClass, LangString, ExtraTriple } from "../../types";
 
 interface Props {
   /** If provided, we're editing an existing class. Otherwise creating. */

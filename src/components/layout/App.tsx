@@ -4,19 +4,19 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { useStore } from "../lib/store";
+import { useStore } from "../../lib/store";
 import OntologyList from "./OntologyList";
-import ClassCard from "./ClassCard";
-import ClassForm from "./ClassForm";
-import UnassignedProperties from "./UnassignedProperties";
-import ImportExport from "./ImportExport";
-import OntologyGraph from "./OntologyGraph";
-import EntityGraph from "./EntityGraph";
-import IndividualCard from "./IndividualCard";
-import ValidationPanel from "./ValidationPanel";
+import ClassCard from "../core/ClassCard";
+import ClassForm from "../forms/ClassForm";
+import UnassignedProperties from "../core/UnassignedProperties";
+import ImportExport from "../core/ImportExport";
+import OntologyGraph from "../graph/OntologyGraph";
+import EntityGraph from "../graph/EntityGraph";
+import IndividualCard from "../core/IndividualCard";
+import ValidationPanel from "../core/ValidationPanel";
 import ClassBrowserPanel from "./ClassBrowserPanel";
-import OntologyDiff from "./OntologyDiff";
-import { validate } from "../lib/validation";
+import OntologyDiff from "../core/OntologyDiff";
+import { validate } from "../../lib/validation";
 import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen, Clipboard, X, GitCompare } from "lucide-react";
 
 function useTheme() {

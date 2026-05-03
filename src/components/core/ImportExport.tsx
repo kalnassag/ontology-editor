@@ -9,8 +9,8 @@
 
 import { useEffect, useCallback } from "react";
 import { Download, Save, Check, Loader2 } from "lucide-react";
-import { useStore } from "../lib/store";
-import { validate } from "../lib/validation";
+import { useStore } from "../../lib/store";
+import { validate } from "../../lib/validation";
 
 export default function ImportExport() {
   const exportTurtle = useStore((s) => s.exportTurtle);

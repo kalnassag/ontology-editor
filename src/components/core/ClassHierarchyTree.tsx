@@ -4,8 +4,8 @@
 
 import { useMemo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
-import { useStore } from "../lib/store";
-import type { OntologyClass } from "../types";
+import { useStore } from "../../lib/store";
+import type { OntologyClass } from "../../types";
 
 interface TreeNode {
   cls: OntologyClass;

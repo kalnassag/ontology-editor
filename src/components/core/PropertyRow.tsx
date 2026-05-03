@@ -5,10 +5,10 @@
 
 import { useState } from "react";
 import { Pencil, Trash2, Clipboard } from "lucide-react";
-import { useStore } from "../lib/store";
-import { compact } from "../lib/uri-utils";
-import PropertyForm from "./PropertyForm";
-import type { OntologyProperty } from "../types";
+import { useStore } from "../../lib/store";
+import { compact } from "../../lib/uri-utils";
+import PropertyForm from "../forms/PropertyForm";
+import type { OntologyProperty } from "../../types";
 
 interface Props {
   property: OntologyProperty;

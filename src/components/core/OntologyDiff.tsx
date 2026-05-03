@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { useStore } from "../lib/store";
-import { diffOntologies, type DiffStatus } from "../lib/ontology-diff";
-import { compact } from "../lib/uri-utils";
-import type { OntologyClass, OntologyProperty } from "../types";
+import { useStore } from "../../lib/store";
+import { diffOntologies, type DiffStatus } from "../../lib/ontology-diff";
+import { compact } from "../../lib/uri-utils";
+import type { OntologyClass, OntologyProperty } from "../../types";
 
 const STATUS_LABEL: Record<DiffStatus, string> = {
   added: "Added",

@@ -3,11 +3,11 @@
  */
 
 import { useState } from "react";
-import { useStore } from "../lib/store";
-import { toCamelCase, XSD_TYPES, compact, expand, buildUri } from "../lib/uri-utils";
+import { useStore } from "../../lib/store";
+import { toCamelCase, XSD_TYPES, compact, expand, buildUri } from "../../lib/uri-utils";
 import LabelEditor from "./LabelEditor";
 import ExtraTripleEditor from "./ExtraTripleEditor";
-import type { OntologyProperty, LangString, PropertyType, ExtraTriple } from "../types";
+import type { OntologyProperty, LangString, PropertyType, ExtraTriple } from "../../types";
 
 interface Props {
   existing?: OntologyProperty;

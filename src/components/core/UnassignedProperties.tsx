@@ -2,7 +2,7 @@
  * Shows properties that have no domain class assigned.
  */
 
-import { useStore } from "../lib/store";
+import { useStore } from "../../lib/store";
 import PropertyRow from "./PropertyRow";
 
 export default function UnassignedProperties() {

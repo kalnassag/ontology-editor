@@ -6,7 +6,7 @@
  */
 
 import { Plus, X } from "lucide-react";
-import type { ExtraTriple } from "../types";
+import type { ExtraTriple } from "../../types";
 
 interface Props {
   values: ExtraTriple[];

@@ -4,7 +4,7 @@
  */
 
 import { AlertCircle, AlertTriangle, X } from "lucide-react";
-import type { ValidationIssue } from "../types";
+import type { ValidationIssue } from "../../types";
 
 interface Props {
   issues: ValidationIssue[];

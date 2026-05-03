@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 import { Search, X } from "lucide-react";
-import ClassHierarchyTree from "./ClassHierarchyTree";
-import ClassDetailPane from "./ClassDetailPane";
+import ClassHierarchyTree from "../core/ClassHierarchyTree";
+import ClassDetailPane from "../core/ClassDetailPane";
 
 interface Props {
   onSelectClass: (id: string | null) => void;

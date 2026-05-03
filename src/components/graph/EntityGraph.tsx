@@ -6,12 +6,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ZoomIn, ZoomOut, Maximize2, Plus, Link, Trash2 } from "lucide-react";
-import { useStore } from "../lib/store";
-import { computeLayout } from "../lib/graph-utils";
-import { localName } from "../lib/uri-utils";
-import CreateEntityDialog from "./CreateEntityDialog";
-import CreateEdgeDialog from "./CreateEdgeDialog";
-import type { Individual, IndividualPropertyValue } from "../types";
+import { useStore } from "../../lib/store";
+import { computeLayout } from "../../lib/graph-utils";
+import { localName } from "../../lib/uri-utils";
+import CreateEntityDialog from "../dialogs/CreateEntityDialog";
+import CreateEdgeDialog from "../dialogs/CreateEdgeDialog";
+import type { Individual, IndividualPropertyValue } from "../../types";
 
 /* ── Node and edge types ─────────────────────────────────────── */
 

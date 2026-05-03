@@ -4,9 +4,9 @@
 
 import { useRef, useState } from "react";
 import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle, Globe, BookOpen, Check } from "lucide-react";
-import { useStore } from "../lib/store";
-import { supportsFileSystemAccess, openTurtleFile } from "../lib/file-access";
-import { COMMON_ONTOLOGIES } from "../lib/common-ontologies";
+import { useStore } from "../../lib/store";
+import { supportsFileSystemAccess, openTurtleFile } from "../../lib/file-access";
+import { COMMON_ONTOLOGIES } from "../../lib/common-ontologies";
 
 interface NewOntologyForm {
   label: string;

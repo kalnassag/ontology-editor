@@ -5,8 +5,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { toCamelCase, buildUri } from "../lib/uri-utils";
-import type { OntologyClass } from "../types";
+import { toCamelCase, buildUri } from "../../lib/uri-utils";
+import type { OntologyClass } from "../../types";
 
 interface Props {
   classes: OntologyClass[];

@@ -6,9 +6,9 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, Check, X, Trash2, Plus } from "lucide-react";
-import { useStore } from "../lib/store";
-import { compact, buildUri, toCamelCase } from "../lib/uri-utils";
-import type { Individual, IndividualPropertyValue, OntologyProperty } from "../types";
+import { useStore } from "../../lib/store";
+import { compact, buildUri, toCamelCase } from "../../lib/uri-utils";
+import type { Individual, IndividualPropertyValue, OntologyProperty } from "../../types";
 
 interface Props {
   individual: Individual;

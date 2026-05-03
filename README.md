@@ -36,17 +36,19 @@ docs/           — Sample ontologies and reference material
 | URI utils             | ✅ Complete     |
 | Persistence (IDB)     | ✅ Complete     |
 | Validation            | ✅ Complete     |
-| Zustand store         | 🔶 Scaffold    |
-| Turtle parser         | 🔴 Stub only   |
-| Turtle serializer     | 🔴 Stub only   |
-| App shell             | 🔶 Scaffold    |
-| ClassCard             | 🔴 Not started |
-| PropertyRow           | 🔴 Not started |
-| PropertyForm          | 🔴 Not started |
-| ClassForm             | 🔴 Not started |
-| LabelEditor           | 🔴 Not started |
-| OntologyList          | 🔴 Not started |
-| ImportExport          | 🔴 Not started |
+| Zustand store         | ✅ Complete     |
+| Turtle parser         | ✅ Complete     |
+| Turtle serializer     | ✅ Complete     |
+| App shell             | ✅ Complete     |
+| ClassCard             | ✅ Complete     |
+| PropertyRow           | ✅ Complete     |
+| PropertyForm          | ✅ Complete     |
+| ClassForm             | ✅ Complete     |
+| LabelEditor           | ✅ Complete     |
+| OntologyList          | ✅ Complete     |
+| ImportExport          | ✅ Complete     |
+| Graph Visualizations  | ✅ Complete     |
+| Individual Handling   | ✅ Complete     |
 
 ### Suggested build order for Claude Code
 

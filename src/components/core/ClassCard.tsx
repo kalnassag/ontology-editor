@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useStore } from '../lib/store';
-import { compact } from '../lib/uri-utils';
+import { useStore } from "../../lib/store";
+import { compact } from "../../lib/uri-utils";
 import PropertyRow from './PropertyRow';
-import ClassForm from './ClassForm';
-import PropertyForm from './PropertyForm';
-import type { OntologyClass } from '../types';
+import ClassForm from '../forms/ClassForm';
+import PropertyForm from '../forms/PropertyForm';
+import type { OntologyClass } from "../../types";
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Clipboard } from 'lucide-react';
 
 interface Props {

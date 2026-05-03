@@ -5,7 +5,7 @@
  */
 
 import { Plus, X } from "lucide-react";
-import type { LangString } from "../types";
+import type { LangString } from "../../types";
 
 interface Props {
   values: LangString[];

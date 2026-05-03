@@ -87,6 +87,9 @@ src/
     UnassignedProperties.tsx — Bucket for domain-less properties
     ImportExport.tsx        — TTL import/export controls
     Toast.tsx               — Notification component
+    OntologyGraph.tsx       — D3 force graph for the entire ontology
+    EntityGraph.tsx         — D3 force graph centered on a specific entity
+    IndividualCard.tsx      — Expandable card for an individual instance
   lib/
     turtle-parser.ts        — Turtle → triples → internal model
     turtle-serializer.ts    — Internal model → valid Turtle

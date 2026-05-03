@@ -4,8 +4,8 @@
  */
 
 import { Pencil, X } from "lucide-react";
-import { useStore } from "../lib/store";
-import { localName } from "../lib/uri-utils";
+import { useStore } from "../../lib/store";
+import { localName } from "../../lib/uri-utils";
 
 interface Props {
   classId: string;

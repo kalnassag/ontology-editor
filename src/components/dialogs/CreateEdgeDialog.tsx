@@ -5,8 +5,8 @@
 
 import { useEffect, useState } from "react";
 import { ArrowRight, X } from "lucide-react";
-import { localName } from "../lib/uri-utils";
-import type { Individual, OntologyProperty } from "../types";
+import { localName } from "../../lib/uri-utils";
+import type { Individual, OntologyProperty } from "../../types";
 
 interface Props {
   source: Individual;

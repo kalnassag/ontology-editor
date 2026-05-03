@@ -1,0 +1,416 @@
+@prefix : <http://kalnassag.com/onepiece#> .
+@prefix dbo: <http://dbpedia.org/ontology/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+: a owl:Ontology ;
+    rdfs:comment "One Piece World Ontology. This is a ontology representing the world of One Piece, including characters, locations, devil fruits, and other relevant entities. this is project is not affiliated with any official One Piece media owners or organizations and all original copyrights belong to the respective owners"@en;
+     .
+
+
+###############################################
+##### Classes and properties                        
+###############################################
+:Character a owl:Class ;
+    rdfs:subClassOf dbo:FictionalCharacter ;
+    rdfs:label "One Piece Character"@en ;
+    rdfs:label "ワンピースのキャラクター"@ja ;
+    skos:prefLabel "Character"@en ;
+    skos:prefLabel "キャラクター"@ja ;
+    rdfs:comment "A character in the One Piece universe."@en ;
+    rdfs:comment "ワンピースの世界に登場するキャラクター。"@ja ;
+    .
+:alias a owl:DatatypeProperty ;
+    rdfs:subPropertyOf schema:alternateName ;
+    rdfs:label "Alias"@en, "別名"@ja ;
+    rdfs:comment "An epithet, nickname or alternative name by which a character is known"@en ;
+    rdfs:domain :Character ;
+    rdfs:range xsd:string .
+:epithet a owl:DatatypeProperty ;
+    rdfs:subPropertyOf :alias ;
+    rdfs:label "Epithet"@en, "通り名"@ja ;
+    rdfs:comment "An epithet (通り名, Tōrina?) is a reputational title attached to a person, usually based on some well-known attribute—such as physical traits, personalities, or deeds."@en ;
+    rdfs:domain :Character ;
+    rdfs:range xsd:string .
+
+
+:temporaryAlias a owl:DatatypeProperty ;
+    rdfs:subPropertyOf :alias ;
+    rdfs:label "Temporary Alias"@en, "仮の別名"@ja ;
+    rdfs:comment "A temporary alias or codename used by a character"@en ;
+    rdfs:domain :Character ;
+    rdfs:range xsd:string .
+
+:romanizedName a owl:DatatypeProperty ;
+    rdfs:label "Romanized Name"@en ;
+    rdfs:comment "The romanized name of a character"@en ;
+    rdfs:domain :Character ;
+    rdfs:range xsd:string .
+
+:Affiliation a owl:Class ;
+    rdfs:label "Affiliation"@en ;
+    rdfs:comment "An entity with which a character or a group of characters affiliates"@en .
+
+:Occupation a owl:Class ;
+    rdfs:label "Occupation"@en ;
+    rdfs:comment "The occupation of a character in the One Piece universe. e.g. Pirate Captain, Cook, Pirate Officer, Marine Admiral"@en .
+
+:DevilFruit a owl:Class ;
+    rdfs:label "Devil Fruit"@en ;
+    rdfs:label "悪魔の実"@ja ;
+    rdfs:comment "A devil fruit found in the One Piece universe"@en.
+
+:Status a owl:Class ;
+    rdfs:label "Status"@en ;
+    rdfs:label "状態"@ja ;
+    rdfs:comment "The current status of a character (alive, deceased, missing, etc.)"@en .
+
+:PirateCrew a owl:Class;
+    rdfs:subClassOf schema:Organization;
+    rdfs:label "Pirate Crew"@en ;
+    rdfs:label "海賊団"@ja ;
+    rdfs:comment "A group of pirates flying under the same jolly roger led by the same captain"@en.
+
+:MarineUnit a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Marine Unit"@en ;
+    rdfs:label "海軍部隊"@ja ;
+    rdfs:comment "A unit of the Marines, such as a fleet or a base"@en .
+:Alliance a owl:Class ;
+    rdfs:label "Alliance"@en ;
+    rdfs:label "同盟"@ja ;
+    rdfs:comment "An alliance formed by different groups/factions"@en;
+    rdfs:example "The alliance between the Starw Hats and the Hearts Pirates"@en.
+
+:Region a owl:Class ;
+    rdfs:label "Region"@en ;
+    rdfs:label "地域"@ja ;
+    rdfs:comment "A region in the world of One Piece, consisting of multiple kingdoms and islands"@en ;
+    rdfs:subClassOf :Location .
+
+:Sea a owl:Class ;
+    rdfs:label "Sea"@en ;
+    rdfs:label "海"@ja ;
+    rdfs:comment "A sea in the world of One Piece"@en ;
+    rdfs:subClassOf :Location .
+
+:Kingdom a owl:Class ;
+    rdfs:label "Kingdom"@en ;
+    rdfs:label "王国"@ja ;
+    rdfs:comment "A kingdom in the world of One Piece, not the same as the island on which the kingdom exists"@en .
+
+:citizenOf a owl:ObjectProperty ;
+    rdfs:label "Citizen Of"@en ;
+    rdfs:label "市民"@ja ;
+    rdfs:comment "The kingdom of which the character is a citizen"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Kingdom, :Island .
+:Island a owl:Class ;
+    rdfs:label "Island"@en ;
+    rdfs:label "島"@ja ;
+    rdfs:subClassOf :Location .
+
+:City a owl:Class ;
+    rdfs:label "City"@en ;
+    rdfs:label "都市"@ja ;
+    rdfs:comment "A city in the One Piece universe"@en ;
+    rdfs:subClassOf :Location .
+
+:Location a owl:Class ;
+    rdfs:label "Location"@en ;
+    rdfs:label "場所"@ja ;
+    rdfs:comment "A location in the One Piece universe, such as a building or landmark"@en .
+
+:Creature a owl:Class ;
+    rdfs:label "Creature"@en ;
+    rdfs:label "生物"@ja ;
+    rdfs:comment "A non-speaking creature in the One Piece universe"@en .
+
+:Race a owl:Class ;
+    rdfs:label "Race"@en ;
+    rdfs:label "種族"@ja ;
+    rdfs:comment "Races, sometimes referred to as Tribes, are groups of sentient beings that share distinctive physical traits. Many races coexist in the world, with some originating from the moon and beyond."@en .
+
+:DevilFruitType a owl:Class ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:oneOf ( :Paramecia :Zoan :Logia )
+    ];
+    rdfs:label "Devil Fruit Type"@en ;
+    rdfs:label "悪魔の実の種類"@ja ;
+    rdfs:comment "The type of devil fruit (Paramecia, Zoan, or Logia)"@en .
+:Arc a owl:Class ;
+    rdfs:label "Story Arc"@en;
+    rdfs:comment "A story arc in the One Piece series"@en ;.
+
+:MangaIssue a owl:Class ;
+    rdfs:subClassOf dbo:ComicIssue ;
+    rdfs:label "Manga Issue"@en ;
+    rdfs:label "漫画の号"@ja ;
+    rdfs:comment "A manga issue of the One Piece series"@en ;.
+
+:AnimeEpisode a owl:Class ;
+    rdfs:subClassOf dbo:Episode ;
+    rdfs:label "Anime Episode"@en ;
+    rdfs:comment "An anime episode of the One Piece series"@en ;.
+
+:Bounty a owl:Class ;
+rdfs:label "Bounty"@en ;
+rdfs:label "懸賞金"@ja ;
+rdfs:comment "The bounty on a pirate's head in berries"@en.
+
+:BloodType a owl:Class ;
+    rdfs:label "Blood Type"@en ;
+    rdfs:label "血液型"@ja ;
+    rdfs:comment "The blood type of a character"@en .
+
+:liveActionPortrayedBy a owl:ObjectProperty ;
+    rdfs:label "Live Action Portrayed By"@en ;
+    rdfs:label "実写版の俳優"@ja ;
+    rdfs:comment "The actor who portrayed the character in the live-action adaptation"@en ;
+    rdfs:domain :Character ;
+    rdfs:range schema:Person .
+###############################################
+##### Properties                             
+###############################################
+
+###############################################
+##### Identifier Properties
+###############################################
+
+# Internal unique identifier (REQUIRED FOR ALL ENTITIES)
+:internalID a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Internal ID"@en ;
+    rdfs:label "内部ID"@ja ;
+    rdfs:comment "Unique internal identifier assigned by this knowledge graph, required for all entities in the graph."@en ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+# Extenral source identifiers (OPTIONAL, multiple allowed)
+:dbpediaID a owl:DatatypeProperty ;
+    rdfs:subPropertyOf dcterms:identifier ;
+    rdfs:label "DBpedia ID"@en ;
+    rdfs:comment "The DBpedia identifier for this entity."@en ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:opwikiID a owl:DatatypeProperty ;
+    rdfs:label "One Piece Wiki ID"@en ;
+    rdfs:comment "The One Piece Wiki identifier for this entity."@en ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:wikipediaOD a owl:DatatypeProperty ;
+    rdfs:subPropertyOf dcterms:identifier ;
+    rdfs:label "Wikipedia OD"@en ;
+    rdfs:comment "The Wikipedia Open Data identifier for this entity."@en ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+:opwikiurl a owl:DatatypeProperty ;
+    rdfs:label "One Piece Wiki URL"@en ;
+    rdfs:comment "The One Piece Wiki URL for this entity."@en ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:anyURI .
+###############################################
+##### Object Properties                             
+###############################################
+
+### Character Properties ###
+:residence a owl:ObjectProperty ;
+    rdfs:label "Residence"@en ;
+    rdfs:comment "The place where a character currently resides"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Location .
+
+:hasBloodType a owl:ObjectProperty ;
+    rdfs:label "Has Blood Type"@en ;
+    rdfs:comment "The blood type of a character"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :BloodType .
+
+:japaneseVoiceActor a owl:ObjectProperty ;
+    rdfs:label "Japanese Voice Actor"@en ;
+    rdfs:comment "The Japanese voice actor for a character"@en ;
+    rdfs:domain :Character ;
+    rdfs:range schema:Person .
+
+:englishVoiceActor a owl:ObjectProperty ;
+    rdfs:label "English Voice Actor"@en ;
+    rdfs:comment "The English voice actor for a character"@en ;
+    rdfs:domain :Character ;
+    rdfs:range schema:Person .
+
+:animeDebut a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:label "Anime Debut"@en ;
+    rdfs:comment "The anime episode in which the character first appeared"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :AnimeEpisode .
+
+:mangaDebut a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:label "Manga Debut"@en ;
+    rdfs:comment "The manga issue in which the character first appeared"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :MangaIssue .
+
+:occupation a owl:ObjectProperty ;
+    rdfs:label "Occupation"@en ;
+    rdfs:comment "The occupation of a character in the One Piece universe"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Occupation .
+
+:statusOfCharacter a owl:ObjectProperty ;
+    rdfs:label "Status of Character"@en ;
+    rdfs:comment "The current status of a character (alive, deceased, missing, etc.)"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Status .
+
+:affiliatesWith a owl:ObjectProperty ;
+    rdfs:label "Affiliates With"@en ;
+    rdfs:comment "The affiliation of a character or group of characters"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Affiliation .
+
+:hasDevilFruit a owl:ObjectProperty ;
+    rdfs:label "Has Devil Fruit"@en ;
+    rdfs:comment "The devil fruit that a character has eaten"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :DevilFruit .
+
+:race a owl:ObjectProperty ;
+    rdfs:label "Race"@en ;
+    rdfs:comment "The race of the character. e.g. Human, Fishman, Merfolk, Mink, Giant"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Race .
+
+:inCrew a owl:ObjectProperty ;  
+    rdfs:label "In Crew"@en ;
+    rdfs:comment "The crew to which this pirate belongs"@en ;
+    owl:inverseOf :hasCrewMember ;
+    rdfs:domain :PirateCrew ;
+    rdfs:range :Character .
+
+:placeOfOrigin a owl:ObjectProperty ;
+    rdfs:label "Place of Origin"@en ;
+    rdfs:comment "The place where a character is originally from"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Location .
+
+:hasBounty a owl:ObjectProperty ;
+    rdfs:label "Has Bounty"@en ;
+    rdfs:comment "The bounty on a pirate's head in berries"@en ;
+    rdfs:domain :Character ;
+    rdfs:range :Bounty ;
+    rdfs:inverseOf :givenTo.
+
+:ageAtDeath a owl:DatatypeProperty ;
+    rdfs:label "Age at Death"@en ;
+    rdfs:comment "The age of a character at the time of their death"@en ;
+    rdfs:domain :Character ;
+    rdfs:range xsd:integer .
+
+:bountyAmount a owl:DatatypeProperty ;
+    rdfs:label "Bounty Amount"@en ;
+    rdfs:comment "The amount of the bounty in berries"@en ;
+    rdfs:domain :Bounty ;
+    rdfs:range xsd:integer .
+
+:height a owl:DatatypeProperty ;
+    rdfs:label "Height"@en;
+    rdfs:comment "The height of a character in centimeters"@en ;
+    rdfs:domain :Character ;
+    rdfs:range xsd:integer .
+
+### Arc Properties ###
+:arcStartManga a owl:ObjectProperty ;
+    rdfs:label "Arc Start Manga"@en ;
+    rdfs:comment "The manga chapter in which the story arc starts"@en ;
+    rdfs:domain :Arc ;
+    rdfs:range :MangaIssue .
+
+:arcEndManga a owl:ObjectProperty ;
+    rdfs:label "Arc End Manga"@en ;
+    rdfs:comment "The manga chapter in which the story arc ends"@en ;
+    rdfs:domain :Arc ;
+    rdfs:range :MangaIssue .
+
+:arcStartAnime a owl:ObjectProperty ;
+    rdfs:label "Arc Start Anime"@en ;
+    rdfs:comment "The anime episode in which the story arc starts"@en ;
+    rdfs:domain :Arc ;
+    rdfs:range :AnimeEpisode .
+
+:arcEndAnime a owl:ObjectProperty ;
+    rdfs:label "Arc End Anime"@en ;
+    rdfs:comment "The anime episode in which the story arc ends"@en ;
+    rdfs:domain :Arc ;
+    rdfs:range :AnimeEpisode .
+
+:containsArc a owl:ObjectProperty ;
+    rdfs:label "Contains Arc"@en ;
+    rdfs:label "包含する編"@ja ;
+    rdfs:comment "The story arcs contained within a larger arc or saga"@en ;
+    rdfs:domain :Arc ;
+    rdfs:range :Arc .
+
+
+### Pirate Crew Properties ###
+:hasCrewMember a owl:ObjectProperty ;
+    rdfs:label "Has Crew Member"@en ;
+    rdfs:comment "A pirate belonging to this crew"@en ;
+    owl:inverseOf :inCrew ;
+    rdfs:domain :PirateCrew ;
+    rdfs:range :Character .
+
+### Devil Fruit Properties ###
+:hasFruitType a owl:ObjectProperty ;
+    rdfs:label "Devil Fruit Type"@en ;
+    rdfs:comment "The type of devil fruit (Paramecia, Zoan, or Logia)"@en ;
+    rdfs:domain :DevilFruit ;
+    rdfs:range :DevilFruitType .
+
+:DevilFruitCurrentUser a owl:ObjectProperty ;
+    rdfs:label "Current User"@en ;
+    rdfs:comment "The current user of the devil fruit"@en ;
+    rdfs:domain :DevilFruit ;
+    rdfs:range :Character .
+
+:DevilFruitPreviousUser a owl:ObjectProperty ;
+    rdfs:label "Previous User"@en ;
+    rdfs:comment "A previous user of the devil fruit"@en ;
+    rdfs:domain :DevilFruit ;
+    rdfs:range :Character .
+
+:devilFruitDebutManga a owl:ObjectProperty ;
+    rdfs:label "Devil Fruit Debut"@en ;
+    rdfs:comment "The chapter or episode in which the devil fruit first appeared"@en ;
+    rdfs:domain :DevilFruit ;
+    rdfs:range :MangaIssue .
+
+:devilFruitDebutAnime a owl:ObjectProperty ;
+    rdfs:label "Devil Fruit Debut Anime"@en ;
+    rdfs:comment "The anime episode in which the devil fruit first appeared"@en ;
+    rdfs:domain :DevilFruit ;
+    rdfs:range :AnimeEpisode .
+
+### Location Properties ###
+:locatedIn a owl:ObjectProperty, owl:TransitiveProperty ;
+    rdfs:label "Located In"@en ;
+    rdfs:comment "The larger location in which this location is found"@en ;
+    rdfs:domain :Location ;
+    rdfs:range :Location .
+
+### Bounty Properties ###
+:givenAfter a owl:ObjectProperty ;
+    rdfs:label "Given After"@en ;
+    rdfs:comment "The arc after which the bounty was given"@en ;
+    rdfs:domain :Bounty ;
+    rdfs:range :Arc .
+:givenTo a owl:ObjectProperty ;
+    rdfs:label "Given To"@en ; 
+    rdfs:comment "The character to whom the bounty was given"@en ;
+    rdfs:domain :Bounty ;
+    rdfs:range :Character .
