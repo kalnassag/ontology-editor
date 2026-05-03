@@ -577,7 +577,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         labels: [],
         descriptions: [],
         domainUri: "",
-        range: "",
+        ranges: [],
         subPropertyOf: [],
         extraTriples: [],
       });
@@ -737,7 +737,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
       } else if (t.p === P.domain && !t.isLiteral) {
         prop.domainUri = t.o;
       } else if (t.p === P.range && !t.isLiteral) {
-        prop.range = t.o;
+        if (!prop.ranges.includes(t.o)) prop.ranges.push(t.o);
       } else if (t.p === P.subPropertyOf && !t.isLiteral) {
         if (!prop.subPropertyOf.includes(t.o)) prop.subPropertyOf.push(t.o);
       } else if (t.p === P.inverseOf && !t.isLiteral) {

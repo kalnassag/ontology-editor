@@ -53,7 +53,7 @@ export interface OntologyProperty {
   labels: LangString[];
   descriptions: LangString[];
   domainUri: string; // URI of the class this property belongs to (rdfs:domain)
-  range: string; // Class URI (object), XSD URI (datatype), or free string (annotation)
+  ranges: string[]; // One or more range URIs (rdfs:range); was single string in v1
   subPropertyOf: string[]; // URIs of parent properties
   /** URI of the inverse property (owl:inverseOf) — ObjectProperty only */
   inverseOf?: string;

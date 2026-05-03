@@ -272,6 +272,11 @@ export const useStore = create<EditorState>((set, get) => {
         }
         for (const prop of onto.properties) {
           if (!prop.extraTriples) prop.extraTriples = [];
+          // Migrate v1 single range string → v2 ranges array
+          if (!prop.ranges) {
+            const legacy = (prop as unknown as { range?: string }).range;
+            prop.ranges = legacy ? [legacy] : [];
+          }
           // inverseOf / cardinality are optional — undefined is fine, no migration needed
         }
       }
@@ -435,7 +440,7 @@ export const useStore = create<EditorState>((set, get) => {
               ? o.properties.map((p) => ({
                   ...p,
                   domainUri: p.domainUri === oldUri ? newUri! : p.domainUri,
-                  range: p.range === oldUri ? newUri! : p.range,
+                  ranges: (p.ranges ?? []).map((r) => r === oldUri ? newUri! : r),
                 }))
               : o.properties,
           };
@@ -485,7 +490,7 @@ export const useStore = create<EditorState>((set, get) => {
         labels: partial.labels || [{ value: label, lang: onto.metadata.defaultLanguage }],
         descriptions: partial.descriptions || [{ value: "", lang: onto.metadata.defaultLanguage }],
         domainUri: partial.domainUri || "",
-        range: partial.range || "",
+        ranges: partial.ranges ?? [],
         subPropertyOf: partial.subPropertyOf || [],
         inverseOf: partial.inverseOf,
         minCardinality: partial.minCardinality,

@@ -54,7 +54,9 @@ function diffProperty(left: OntologyProperty, right: OntologyProperty): string[]
   if (labelKey(left.labels) !== labelKey(right.labels)) changes.push(`Labels changed`);
   if (labelKey(left.descriptions) !== labelKey(right.descriptions)) changes.push(`Descriptions changed`);
   if (left.domainUri !== right.domainUri) changes.push(`Domain: ${left.domainUri || "(none)"} → ${right.domainUri || "(none)"}`);
-  if (left.range !== right.range) changes.push(`Range: ${left.range || "(none)"} → ${right.range || "(none)"}`);
+  const leftRanges  = [...(left.ranges  ?? [])].sort().join(",");
+  const rightRanges = [...(right.ranges ?? [])].sort().join(",");
+  if (leftRanges !== rightRanges) changes.push(`Range: ${leftRanges || "(none)"} → ${rightRanges || "(none)"}`);
   if (left.inverseOf !== right.inverseOf) changes.push(`inverseOf changed`);
   if (left.minCardinality !== right.minCardinality) changes.push(`minCardinality: ${left.minCardinality ?? "—"} → ${right.minCardinality ?? "—"}`);
   if (left.maxCardinality !== right.maxCardinality) changes.push(`maxCardinality: ${left.maxCardinality ?? "—"} → ${right.maxCardinality ?? "—"}`);

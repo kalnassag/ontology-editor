@@ -15,10 +15,11 @@ import {
   type Simulation,
   type SimulationNodeDatum,
 } from "d3-force";
-import { X, ZoomIn, ZoomOut, Maximize2, RefreshCw } from "lucide-react";
+import { X, ZoomIn, ZoomOut, Maximize2, RefreshCw, Plus, Pencil, Trash2, CirclePlus } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { compact } from "../../lib/uri-utils";
 import ClassForm from "../forms/ClassForm";
+import PropertyForm from "../forms/PropertyForm";
 
 // ── VOWL palette ──────────────────────────────────────────────────
 const V = {
@@ -97,9 +98,27 @@ function resolvedPos(end: string | SimNode, fallback: Map<string, SimNode>): Sim
   return fallback.get(end);
 }
 
+// ── Context menu state ────────────────────────────────────────────
+interface ContextMenu {
+  x: number; // screen px
+  y: number;
+  type: "canvas" | "class-node" | "edge";
+  nodeId?: string;   // class node id
+  linkId?: string;   // D3Link id
+}
+
+// ── Floating panel state ───────────────────────────────────────────
+type FloatingPanel =
+  | { kind: "edit-class"; classId: string; x: number; y: number }
+  | { kind: "new-class"; x: number; y: number }
+  | { kind: "edit-property"; propertyId: string; x: number; y: number }
+  | { kind: "new-property"; defaultDomainUri: string; x: number; y: number };
+
 // ── Component ─────────────────────────────────────────────────────
 export default function OntologyGraph({ onClose }: Props) {
   const activeOntology = useStore((s) => s.getActiveOntology());
+  const deleteClass    = useStore((s) => s.deleteClass);
+  const deleteProperty = useStore((s) => s.deleteProperty);
   const svgRef         = useRef<SVGSVGElement>(null);
   const containerRef   = useRef<HTMLDivElement>(null);
 
@@ -123,11 +142,14 @@ export default function OntologyGraph({ onClose }: Props) {
   const classes    = activeOntology?.classes    ?? [];
   const properties = activeOntology?.properties ?? [];
 
-  const [hoveredId,      setHoveredId]      = useState<string | null>(null);
-  const [editingClassId, setEditingClassId] = useState<string | null>(null);
-  const [editPanelPos,   setEditPanelPos]   = useState({ x: 0, y: 0 });
-  const [showDatatypes, setShowDatatypes] = useState(true);
-  const [showAnnotations, setShowAnnotations] = useState(true);
+  const [hoveredId,        setHoveredId]        = useState<string | null>(null);
+  // Kept for legacy double-click path but now superseded by floatingPanel
+  const [editingClassId,   setEditingClassId]    = useState<string | null>(null);
+  const [editPanelPos]                           = useState({ x: 0, y: 0 });
+  const [showDatatypes,    setShowDatatypes]     = useState(true);
+  const [showAnnotations,  setShowAnnotations]   = useState(true);
+  const [contextMenu,      setContextMenu]       = useState<ContextMenu | null>(null);
+  const [floatingPanel,    setFloatingPanel]     = useState<FloatingPanel | null>(null);
 
   // ── Tick handler (rAF-batched) ────────────────────────────────────
   const scheduleTick = useCallback(() => {
@@ -175,8 +197,8 @@ export default function OntologyGraph({ onClose }: Props) {
     const dtypeUriSet = new Set<string>();
     if (showDatatypes) {
       for (const prop of properties) {
-        if (prop.type === "owl:DatatypeProperty" && prop.domainUri && prop.range) {
-          dtypeUriSet.add(prop.range);
+        if (prop.type === "owl:DatatypeProperty" && prop.domainUri) {
+          for (const r of prop.ranges ?? []) dtypeUriSet.add(r);
         }
       }
     }
@@ -206,41 +228,50 @@ export default function OntologyGraph({ onClose }: Props) {
 
     const seenInverse = new Set<string>();
     for (const prop of properties) {
-      if (prop.type !== "owl:ObjectProperty" || !prop.domainUri || !prop.range) continue;
+      if (prop.type !== "owl:ObjectProperty" || !prop.domainUri || !(prop.ranges ?? []).length) continue;
       const dom = classes.find((c) => c.uri === prop.domainUri);
-      const rng = classes.find((c) => c.uri === prop.range);
-      if (!dom || !rng) continue;
+      if (!dom) continue;
 
-      if (prop.inverseOf) {
-        const key = [prop.uri, prop.inverseOf].sort().join("|");
-        if (seenInverse.has(key)) continue;
-        seenInverse.add(key);
-        const invP   = properties.find((p) => p.uri === prop.inverseOf);
-        const invLbl = invP ? (invP.labels[0]?.value || invP.localName) : "inverse";
-        links.push({ id: `inv-${key}`, source: dom.id, target: rng.id, label: `${prop.labels[0]?.value || prop.localName} ⇌ ${invLbl}`, type: "inverseOf" });
-      } else {
-        const done = properties.some((p) => p.inverseOf === prop.uri && seenInverse.has([p.uri, prop.uri].sort().join("|")));
-        if (done) continue;
-        links.push({ id: `obj-${prop.id}`, source: dom.id, target: rng.id, label: prop.labels[0]?.value || prop.localName, type: "objectProperty" });
+      for (const rangeUri of prop.ranges ?? []) {
+        const rng = classes.find((c) => c.uri === rangeUri);
+        if (!rng) continue;
+
+        if (prop.inverseOf) {
+          const key = [prop.uri, prop.inverseOf].sort().join("|") + "-" + rng.id;
+          if (seenInverse.has(key)) continue;
+          seenInverse.add(key);
+          const invP   = properties.find((p) => p.uri === prop.inverseOf);
+          const invLbl = invP ? (invP.labels[0]?.value || invP.localName) : "inverse";
+          links.push({ id: `inv-${key}`, source: dom.id, target: rng.id, label: `${prop.labels[0]?.value || prop.localName} ⇌ ${invLbl}`, type: "inverseOf" });
+        } else {
+          const done = properties.some((p) => p.inverseOf === prop.uri && seenInverse.has([p.uri, prop.uri].sort().join("|") + "-" + rng.id));
+          if (done) continue;
+          links.push({ id: `obj-${prop.id}-${rng.id}`, source: dom.id, target: rng.id, label: prop.labels[0]?.value || prop.localName, type: "objectProperty" });
+        }
       }
     }
 
     if (showDatatypes) {
       for (const prop of properties) {
-        if (prop.type !== "owl:DatatypeProperty" || !prop.domainUri || !prop.range) continue;
+        if (prop.type !== "owl:DatatypeProperty" || !prop.domainUri || !(prop.ranges ?? []).length) continue;
         const dom = classes.find((c) => c.uri === prop.domainUri);
         if (!dom) continue;
-        links.push({ id: `dtype-${prop.id}`, source: dom.id, target: `dtype:${prop.range}`, label: prop.labels[0]?.value || prop.localName, type: "datatypeProperty" });
+        for (const rangeUri of prop.ranges ?? []) {
+          links.push({ id: `dtype-${prop.id}-${rangeUri}`, source: dom.id, target: `dtype:${rangeUri}`, label: prop.labels[0]?.value || prop.localName, type: "datatypeProperty" });
+        }
       }
     }
 
     if (showAnnotations) {
       for (const prop of properties) {
-        if (prop.type !== "owl:AnnotationProperty" || !prop.domainUri || !prop.range) continue;
+        if (prop.type !== "owl:AnnotationProperty" || !prop.domainUri || !(prop.ranges ?? []).length) continue;
         const dom = classes.find((c) => c.uri === prop.domainUri);
-        const rng = classes.find((c) => c.uri === prop.range);
-        if (!dom || !rng) continue;
-        links.push({ id: `annot-${prop.id}`, source: dom.id, target: rng.id, label: prop.labels[0]?.value || prop.localName, type: "annotationProperty" });
+        if (!dom) continue;
+        for (const rangeUri of prop.ranges ?? []) {
+          const rng = classes.find((c) => c.uri === rangeUri);
+          if (!rng) continue;
+          links.push({ id: `annot-${prop.id}-${rng.id}`, source: dom.id, target: rng.id, label: prop.labels[0]?.value || prop.localName, type: "annotationProperty" });
+        }
       }
     }
 
@@ -443,11 +474,37 @@ export default function OntologyGraph({ onClose }: Props) {
     const nx = node.x ?? 0, ny = node.y ?? 0;
     const sx = ((nx - viewBox.x) / viewBox.w) * cr.width;
     const sy = ((ny - viewBox.y) / viewBox.h) * cr.height;
-    setEditPanelPos({
-      x: Math.min(Math.max(sx + 20, 8), cr.width  - 368),
-      y: Math.min(Math.max(sy - 40, 40), cr.height - 488),
-    });
-    setEditingClassId(nodeId);
+    const px = Math.min(Math.max(sx + 20, 8), cr.width  - 368);
+    const py = Math.min(Math.max(sy - 40, 40), cr.height - 488);
+    setContextMenu(null);
+    setFloatingPanel({ kind: "edit-class", classId: nodeId, x: px, y: py });
+  };
+
+  // ── Right-click context menu ──────────────────────────────────────
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const target = e.target as SVGElement;
+    const nodeId = target.closest("[data-node-id]")?.getAttribute("data-node-id") ?? undefined;
+    const linkId = target.closest("[data-link-id]")?.getAttribute("data-link-id") ?? undefined;
+    const type: ContextMenu["type"] = nodeId ? "class-node" : linkId ? "edge" : "canvas";
+    setContextMenu({ x: e.clientX, y: e.clientY, type, nodeId, linkId });
+    setFloatingPanel(null);
+  };
+
+  // ── Open floating panel (clamped to container bounds) ─────────────
+  const openPanel = (panel: FloatingPanel) => {
+    setFloatingPanel(panel);
+    setContextMenu(null);
+    setEditingClassId(null);
+  };
+
+  const panelFromClientXY = (cx: number, cy: number) => {
+    const cr = containerRef.current?.getBoundingClientRect();
+    if (!cr) return { x: 16, y: 60 };
+    return {
+      x: Math.min(Math.max(cx - cr.left + 8, 8), cr.width  - 380),
+      y: Math.min(Math.max(cy - cr.top  - 20, 40), cr.height - 520),
+    };
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -468,6 +525,7 @@ export default function OntologyGraph({ onClose }: Props) {
 
   // ── Edge rendering ────────────────────────────────────────────────
   const renderEdge = useCallback((link: D3Link) => {
+    // Attach a hit area + data-link-id for right-click context menu
     const srcNode = resolvedPos(link.source, nodeMapRef.current);
     const tgtNode = resolvedPos(link.target, nodeMapRef.current);
     if (!srcNode || !tgtNode) return null;
@@ -542,7 +600,12 @@ export default function OntologyGraph({ onClose }: Props) {
     }
 
     return (
-      <g key={link.id}>
+      <g key={link.id} data-link-id={link.id}>
+        {/* Transparent wide hit area so right-click is easy */}
+        <path
+          d={`M ${src.x} ${src.y} Q ${ctrlX} ${ctrlY} ${tgt.x} ${tgt.y}`}
+          fill="none" stroke="transparent" strokeWidth={18}
+        />
         <path
           d={`M ${src.x} ${src.y} Q ${ctrlX} ${ctrlY} ${tgt.x} ${tgt.y}`}
           fill="none" stroke={lineColor}
@@ -672,8 +735,15 @@ export default function OntologyGraph({ onClose }: Props) {
             <input type="checkbox" checked={showAnnotations} onChange={(e) => setShowAnnotations(e.target.checked)} className="accent-th-fg" />
             Annotations
           </label>
-          <span className="mr-2 text-2xs text-th-fg-4" title="Drag to pin a node in place. Shift+click to unpin. Reheat unpins all.">
-            drag=pin · ⇧click=unpin
+          <button
+            onClick={() => openPanel({ kind: "new-class", x: 80, y: 60 })}
+            className="mr-1 flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium text-blue-400 hover:bg-blue-400/10"
+            title="Create a new class"
+          >
+            <Plus size={12} /> New Class
+          </button>
+          <span className="mr-2 text-2xs text-th-fg-4" title="Right-click canvas/nodes/edges to create or edit. Drag to pin. Shift+click to unpin.">
+            right-click to edit · drag=pin
           </span>
           <button onClick={reheat} className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Unpin all nodes and reheat layout"><RefreshCw size={13} /></button>
           <button onClick={() => zoom(0.8)}  className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Zoom in"><ZoomIn    size={14} /></button>
@@ -699,6 +769,7 @@ export default function OntologyGraph({ onClose }: Props) {
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
           onDoubleClick={handleDoubleClick}
+          onContextMenu={handleContextMenu}
           style={{ cursor: panDrag ? "grabbing" : "default" }}
         >
           <defs>
@@ -750,14 +821,183 @@ export default function OntologyGraph({ onClose }: Props) {
         );
       })()}
 
-      {/* Floating class editor */}
-      {editingClassId && (() => {
+      {/* ── Context menu ────────────────────────────────────────────── */}
+      {contextMenu && (
+        <>
+          {/* Backdrop to dismiss */}
+          <div className="fixed inset-0 z-40" onMouseDown={() => setContextMenu(null)} />
+          <div
+            className="fixed z-50 min-w-44 rounded-lg border border-th-border bg-th-surface py-1 shadow-2xl"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            {/* ── Canvas right-click ── */}
+            {contextMenu.type === "canvas" && (
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-th-fg-2 hover:bg-th-hover hover:text-th-fg"
+                onClick={() => openPanel({ kind: "new-class", ...panelFromClientXY(contextMenu.x, contextMenu.y) })}
+              >
+                <Plus size={13} className="text-blue-400" />
+                New Class
+              </button>
+            )}
+
+            {/* ── Class node right-click ── */}
+            {contextMenu.type === "class-node" && contextMenu.nodeId && (() => {
+              const nodeId = contextMenu.nodeId!;
+              const cls = classes.find((c) => c.id === nodeId);
+              return (
+                <>
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-th-fg-2 hover:bg-th-hover hover:text-th-fg"
+                    onClick={() => openPanel({ kind: "edit-class", classId: nodeId, ...panelFromClientXY(contextMenu.x, contextMenu.y) })}
+                  >
+                    <Pencil size={12} className="text-th-fg-3" />
+                    Edit Class
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-th-fg-2 hover:bg-th-hover hover:text-th-fg"
+                    onClick={() => openPanel({ kind: "new-property", defaultDomainUri: cls?.uri ?? "", ...panelFromClientXY(contextMenu.x, contextMenu.y) })}
+                  >
+                    <CirclePlus size={13} className="text-emerald-400" />
+                    Add Property
+                  </button>
+                  <div className="my-1 border-t border-th-border" />
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-400/10"
+                    onClick={() => { deleteClass(nodeId); setContextMenu(null); }}
+                  >
+                    <Trash2 size={12} />
+                    Delete Class
+                  </button>
+                </>
+              );
+            })()}
+
+            {/* ── Edge right-click ── */}
+            {contextMenu.type === "edge" && contextMenu.linkId && (() => {
+              const link = simLinksRef.current.find((l) => l.id === contextMenu.linkId);
+              if (!link) return null;
+              // Derive property id from link id: "obj-<propId>", "dtype-<propId>", "annot-<propId>"
+              const propId = link.id.replace(/^(obj|dtype|annot|inv)-/, "");
+              const prop = properties.find((p) => p.id === propId);
+              return (
+                <>
+                  {prop && (
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-th-fg-2 hover:bg-th-hover hover:text-th-fg"
+                      onClick={() => openPanel({ kind: "edit-property", propertyId: prop.id, ...panelFromClientXY(contextMenu.x, contextMenu.y) })}
+                    >
+                      <Pencil size={12} className="text-th-fg-3" />
+                      Edit Property
+                    </button>
+                  )}
+                  {prop && (
+                    <>
+                      <div className="my-1 border-t border-th-border" />
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-400/10"
+                        onClick={() => { deleteProperty(prop.id); setContextMenu(null); }}
+                      >
+                        <Trash2 size={12} />
+                        Delete Property
+                      </button>
+                    </>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </>
+      )}
+
+      {/* ── Floating editor panels ───────────────────────────────────── */}
+      {floatingPanel && (() => {
+        const close = () => setFloatingPanel(null);
+        const panelStyle: React.CSSProperties = {
+          position: "absolute",
+          left: floatingPanel.x,
+          top: floatingPanel.y,
+          width: 370,
+          zIndex: 50,
+          maxHeight: "calc(100% - 80px)",
+        };
+        const headerCls = "flex items-center justify-between rounded-t border-b border-th-border-muted bg-th-surface px-3 py-1.5";
+
+        if (floatingPanel.kind === "edit-class") {
+          const cls = classes.find((c) => c.id === floatingPanel.classId);
+          if (!cls) return null;
+          return (
+            <div style={panelStyle} className="rounded-lg border border-th-border shadow-2xl">
+              <div className={headerCls}>
+                <span className="text-xs font-semibold text-th-fg">Edit Class · {cls.labels[0]?.value || cls.localName}</span>
+                <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+                <ClassForm existing={cls} onDone={close} />
+              </div>
+            </div>
+          );
+        }
+
+        if (floatingPanel.kind === "new-class") {
+          return (
+            <div style={panelStyle} className="rounded-lg border border-th-border shadow-2xl">
+              <div className={headerCls}>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-th-fg">
+                  <Plus size={12} className="text-blue-400" /> New Class
+                </span>
+                <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+                <ClassForm onDone={close} />
+              </div>
+            </div>
+          );
+        }
+
+        if (floatingPanel.kind === "edit-property") {
+          const prop = properties.find((p) => p.id === floatingPanel.propertyId);
+          if (!prop) return null;
+          return (
+            <div style={panelStyle} className="rounded-lg border border-th-border shadow-2xl">
+              <div className={headerCls}>
+                <span className="text-xs font-semibold text-th-fg">Edit Property · {prop.labels[0]?.value || prop.localName}</span>
+                <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+                <PropertyForm existing={prop} onDone={close} />
+              </div>
+            </div>
+          );
+        }
+
+        if (floatingPanel.kind === "new-property") {
+          return (
+            <div style={panelStyle} className="rounded-lg border border-th-border shadow-2xl">
+              <div className={headerCls}>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-th-fg">
+                  <CirclePlus size={12} className="text-emerald-400" /> New Property
+                </span>
+                <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+                <PropertyForm defaultDomainUri={floatingPanel.defaultDomainUri} onDone={close} />
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
+
+      {/* Legacy double-click class editor (kept as fallback) */}
+      {editingClassId && !floatingPanel && (() => {
         const cls = classes.find((c) => c.id === editingClassId);
         if (!cls) return null;
         return (
           <div
             style={{ position: "absolute", left: editPanelPos.x, top: editPanelPos.y, width: 360, zIndex: 50 }}
-            className="rounded border border-th-border shadow-2xl"
+            className="rounded-lg border border-th-border shadow-2xl"
           >
             <div className="flex items-center justify-between rounded-t border-b border-th-border-muted bg-th-surface px-3 py-1.5">
               <span className="text-xs font-semibold text-th-fg">Edit: {cls.labels[0]?.value || cls.localName}</span>

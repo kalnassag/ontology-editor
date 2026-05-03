@@ -168,9 +168,9 @@ export default function ClassDetailPane({ classId, onEditClass, onSelectClass }:
                           <span className="flex-1 truncate text-th-fg">
                             {prop.labels[0]?.value || prop.localName}
                           </span>
-                          {prop.range && (
+                          {(prop.ranges ?? []).length > 0 && (
                             <span className="truncate text-2xs text-th-fg-4">
-                              {localName(prop.range) || prop.range}
+                              {(prop.ranges ?? []).map((r) => localName(r) || r).join(", ")}
                             </span>
                           )}
                         </div>

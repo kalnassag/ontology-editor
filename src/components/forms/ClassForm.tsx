@@ -35,6 +35,8 @@ export default function ClassForm({ existing, onDone }: Props) {
   const [uriValue, setUriValue] = useState(existing?.uri ?? "");
   const [subClassOf, setSubClassOf] = useState<string[]>(existing?.subClassOf ?? []);
   const [disjointWith, setDisjointWith] = useState<string[]>(existing?.disjointWith ?? []);
+  // "pills" = current tag-buttons, "dropdown" = a searchable select
+  const [classPickerMode, setClassPickerMode] = useState<"pills" | "dropdown">("pills");
 
   // Extra triples — stored in compact/prefixed form for editing
   const [extraTriples, setExtraTriples] = useState<ExtraTriple[]>(
@@ -180,56 +182,137 @@ export default function ClassForm({ existing, onDone }: Props) {
         />
       </div>
 
-      {/* subClassOf */}
+      {/* subClassOf + disjointWith with view toggle */}
       {parentOptions.length > 0 && (
-        <div>
-          <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
-            subClassOf
-          </label>
-          <div className="flex flex-wrap gap-1">
-            {parentOptions.map((cls) => {
-              const selected = subClassOf.includes(cls.uri);
-              return (
-                <button
-                  key={cls.id}
-                  onClick={() => toggleParent(cls.uri)}
-                  className={`rounded px-2 py-0.5 text-2xs ${
-                    selected
-                      ? "bg-blue-700 text-white"
-                      : "bg-th-hover text-th-fg-3 hover:bg-th-border"
-                  }`}
-                >
-                  {cls.labels[0]?.value || cls.localName}
-                </button>
-              );
-            })}
+        <div className="space-y-3">
+          {/* Mode toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-2xs font-medium uppercase tracking-wide text-th-fg-3">Class Relationships</span>
+            <div className="flex rounded border border-th-border text-2xs overflow-hidden">
+              <button
+                onClick={() => setClassPickerMode("pills")}
+                className={`px-2 py-0.5 ${classPickerMode === "pills" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
+                title="Show as pill toggles"
+              >Pills</button>
+              <button
+                onClick={() => setClassPickerMode("dropdown")}
+                className={`px-2 py-0.5 border-l border-th-border ${classPickerMode === "dropdown" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
+                title="Show as dropdown"
+              >Dropdown</button>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* owl:disjointWith */}
-      {parentOptions.length > 0 && (
-        <div>
-          <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
-            owl:disjointWith
-          </label>
-          <div className="flex flex-wrap gap-1">
-            {parentOptions.map((cls) => {
-              const selected = disjointWith.includes(cls.uri);
-              return (
-                <button
-                  key={cls.id}
-                  onClick={() => toggleDisjoint(cls.uri)}
-                  className={`rounded px-2 py-0.5 text-2xs ${
-                    selected
-                      ? "bg-red-700 text-white"
-                      : "bg-th-hover text-th-fg-3 hover:bg-th-border"
-                  }`}
+          {/* subClassOf */}
+          <div>
+            <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+              subClassOf
+              {subClassOf.length > 0 && (
+                <span className="ml-1.5 rounded bg-blue-600/20 px-1.5 text-2xs font-normal text-blue-400">{subClassOf.length}</span>
+              )}
+            </label>
+            {classPickerMode === "pills" ? (
+              <div className="flex flex-wrap gap-1">
+                {parentOptions.map((cls) => {
+                  const selected = subClassOf.includes(cls.uri);
+                  return (
+                    <button
+                      key={cls.id}
+                      onClick={() => toggleParent(cls.uri)}
+                      className={`rounded px-2 py-0.5 text-2xs ${
+                        selected
+                          ? "bg-blue-700 text-white"
+                          : "bg-th-hover text-th-fg-3 hover:bg-th-border"
+                      }`}
+                    >
+                      {cls.labels[0]?.value || cls.localName}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {/* Selected chips */}
+                {subClassOf.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {subClassOf.map((uri) => {
+                      const cls = parentOptions.find((c) => c.uri === uri);
+                      return (
+                        <span key={uri} className="flex items-center gap-1 rounded-full bg-blue-700/30 px-2 py-0.5 text-2xs text-blue-300">
+                          {cls?.labels[0]?.value || cls?.localName || uri.split(/[#/]/).pop()}
+                          <button onClick={() => toggleParent(uri)} className="opacity-60 hover:opacity-100">×</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <select
+                  value=""
+                  onChange={(e) => { if (e.target.value) toggleParent(e.target.value); }}
+                  className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  {cls.labels[0]?.value || cls.localName}
-                </button>
-              );
-            })}
+                  <option value="">+ Add parent class…</option>
+                  {parentOptions.filter((c) => !subClassOf.includes(c.uri)).map((cls) => (
+                    <option key={cls.id} value={cls.uri}>{cls.labels[0]?.value || cls.localName}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* owl:disjointWith */}
+          <div>
+            <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+              owl:disjointWith
+              {disjointWith.length > 0 && (
+                <span className="ml-1.5 rounded bg-red-600/20 px-1.5 text-2xs font-normal text-red-400">{disjointWith.length}</span>
+              )}
+            </label>
+            {classPickerMode === "pills" ? (
+              <div className="flex flex-wrap gap-1">
+                {parentOptions.map((cls) => {
+                  const selected = disjointWith.includes(cls.uri);
+                  return (
+                    <button
+                      key={cls.id}
+                      onClick={() => toggleDisjoint(cls.uri)}
+                      className={`rounded px-2 py-0.5 text-2xs ${
+                        selected
+                          ? "bg-red-700 text-white"
+                          : "bg-th-hover text-th-fg-3 hover:bg-th-border"
+                      }`}
+                    >
+                      {cls.labels[0]?.value || cls.localName}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {disjointWith.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {disjointWith.map((uri) => {
+                      const cls = parentOptions.find((c) => c.uri === uri);
+                      return (
+                        <span key={uri} className="flex items-center gap-1 rounded-full bg-red-700/30 px-2 py-0.5 text-2xs text-red-300">
+                          {cls?.labels[0]?.value || cls?.localName || uri.split(/[#/]/).pop()}
+                          <button onClick={() => toggleDisjoint(uri)} className="opacity-60 hover:opacity-100">×</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <select
+                  value=""
+                  onChange={(e) => { if (e.target.value) toggleDisjoint(e.target.value); }}
+                  className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">+ Add disjoint class…</option>
+                  {parentOptions.filter((c) => !disjointWith.includes(c.uri)).map((cls) => (
+                    <option key={cls.id} value={cls.uri}>{cls.labels[0]?.value || cls.localName}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}

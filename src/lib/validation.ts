@@ -114,24 +114,32 @@ export function validate(ontology: Ontology): ValidationIssue[] {
       });
     }
 
-    if (prop.type === "owl:ObjectProperty" && prop.range && !classUris.has(prop.range)) {
-      issues.push({
-        severity: "warning",
-        entityId: prop.id,
-        entityType: "property",
-        message: `Object property range is not a known class: ${prop.range}`,
-        field: "range",
-      });
+    if (prop.type === "owl:ObjectProperty") {
+      for (const r of prop.ranges ?? []) {
+        if (!classUris.has(r)) {
+          issues.push({
+            severity: "warning",
+            entityId: prop.id,
+            entityType: "property",
+            message: `Object property range is not a known class: ${r}`,
+            field: "ranges",
+          });
+        }
+      }
     }
 
-    if (prop.type === "owl:DatatypeProperty" && prop.range && !xsdUris.has(prop.range)) {
-      issues.push({
-        severity: "warning",
-        entityId: prop.id,
-        entityType: "property",
-        message: `Datatype property range is not a known XSD type: ${prop.range}`,
-        field: "range",
-      });
+    if (prop.type === "owl:DatatypeProperty") {
+      for (const r of prop.ranges ?? []) {
+        if (!xsdUris.has(r)) {
+          issues.push({
+            severity: "warning",
+            entityId: prop.id,
+            entityType: "property",
+            message: `Datatype property range is not a known XSD type: ${r}`,
+            field: "ranges",
+          });
+        }
+      }
     }
 
     if (allUris.has(prop.uri)) {

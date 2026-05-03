@@ -188,7 +188,9 @@ export function serializeToTurtle(ontology: Ontology): string {
       pairs.push(["rdfs:comment", langLit(desc)]);
     }
     if (prop.domainUri) pairs.push(["rdfs:domain", c(prop.domainUri)]);
-    if (prop.range) pairs.push(["rdfs:range", c(prop.range)]);
+    for (const rangeUri of prop.ranges ?? []) {
+      pairs.push(["rdfs:range", c(rangeUri)]);
+    }
     for (const parentUri of prop.subPropertyOf) {
       pairs.push(["rdfs:subPropertyOf", c(parentUri)]);
     }

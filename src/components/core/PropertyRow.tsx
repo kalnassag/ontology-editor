@@ -29,7 +29,9 @@ export default function PropertyRow({ property }: Props) {
   const prefixes = activeOntology?.metadata.prefixes ?? {};
   const badge = TYPE_BADGE[property.type];
   const primaryLabel = property.labels[0]?.value || property.localName;
-  const rangeLabel = property.range ? compact(property.range, prefixes) : null;
+  const rangeLabel = (property.ranges ?? []).length > 0
+    ? (property.ranges ?? []).map((r) => compact(r, prefixes)).join(", ")
+    : null;
   const description = property.descriptions[0]?.value;
 
   if (editing) {
