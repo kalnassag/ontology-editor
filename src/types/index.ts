@@ -22,6 +22,13 @@ export type PropertyType =
   | "owl:DatatypeProperty"
   | "owl:AnnotationProperty";
 
+/** An OWL 2 Restriction (e.g. owl:someValuesFrom) */
+export interface OntologyRestriction {
+  propertyUri: string; // e.g. owl:onProperty -> :hasTopping
+  type: "someValuesFrom" | "allValuesFrom" | "hasValue" | "minCardinality" | "maxCardinality" | "exactCardinality";
+  value: string; // Target URI or literal
+}
+
 /** An OWL class in the ontology */
 export interface OntologyClass {
   id: string;
@@ -31,6 +38,8 @@ export interface OntologyClass {
   descriptions: LangString[];
   subClassOf: string[]; // URIs of parent classes
   disjointWith: string[]; // URIs of disjoint classes (owl:disjointWith)
+  /** Logical restrictions defining this class */
+  restrictions: OntologyRestriction[];
   /** Additional triples not mapped to dedicated fields (e.g., prov:wasQuotedFrom) */
   extraTriples: ExtraTriple[];
 }

@@ -265,8 +265,10 @@ export const useStore = create<EditorState>((set, get) => {
       for (const onto of ontologies) {
         if (!onto.individuals) onto.individuals = [];
         for (const cls of onto.classes) {
-          if (!cls.extraTriples) cls.extraTriples = [];
+          if (!cls.subClassOf) cls.subClassOf = [];
           if (!cls.disjointWith) cls.disjointWith = [];
+          if (!cls.restrictions) cls.restrictions = [];
+          if (!cls.extraTriples) cls.extraTriples = [];
         }
         for (const prop of onto.properties) {
           if (!prop.extraTriples) prop.extraTriples = [];
@@ -392,6 +394,7 @@ export const useStore = create<EditorState>((set, get) => {
         descriptions: partial.descriptions || [{ value: "", lang: onto.metadata.defaultLanguage }],
         subClassOf: partial.subClassOf || [],
         disjointWith: partial.disjointWith || [],
+        restrictions: partial.restrictions || [],
         extraTriples: partial.extraTriples || [],
       };
 

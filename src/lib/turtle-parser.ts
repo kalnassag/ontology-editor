@@ -5,7 +5,7 @@
  * Output: ParseResult { prefixes, baseUri, triples, errors }
  */
 
-import type { ParseResult, ParsedTriple, ParseError, OntologyClass, OntologyProperty, OntologyMetadata, UnmappedTriple, Individual, IndividualPropertyValue, ExtraTriple } from "../types";
+import type { ParseResult, ParsedTriple, ParseError, OntologyClass, OntologyProperty, OntologyMetadata, UnmappedTriple, Individual, IndividualPropertyValue, ExtraTriple, OntologyRestriction } from "../types";
 import { localName as extractLocalName, namespace } from "./uri-utils";
 
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
@@ -16,7 +16,7 @@ type Token =
   | { type: "IRI"; value: string; line: number }
   | { type: "PREFIXED"; prefix: string; local: string; line: number }
   | { type: "LITERAL"; value: string; lang?: string; datatypeRaw?: string; line: number }
-  | { type: "PUNCT"; value: "." | ";" | ","; line: number }
+  | { type: "PUNCT"; value: "." | ";" | "," | "[" | "]"; line: number }
   | { type: "AT_KW"; keyword: "prefix" | "base"; line: number }
   | { type: "BARE"; keyword: string; line: number };
 
@@ -140,22 +140,7 @@ function tokenize(input: string): { tokens: Token[]; errors: ParseError[] } {
     return local;
   };
 
-  // Skip over a blank node property list [ ... ] or labeled blank node _:xxx
-  const skipBlankNode = () => {
-    if (peek() === "[") {
-      advance(); // consume '['
-      let depth = 1;
-      while (pos < input.length && depth > 0) {
-        const ch = advance();
-        if (ch === "[") depth++;
-        else if (ch === "]") depth--;
-        else if (ch === '"') {
-          // consume string to avoid treating [ or ] inside strings as brackets
-          readString(); // already consumed opening "
-        }
-      }
-    }
-  };
+  // Blank nodes are emitted as punctuation tokens for '[' and ']'
 
   while (pos < input.length) {
     skipWS();
@@ -210,17 +195,17 @@ function tokenize(input: string): { tokens: Token[]; errors: ParseError[] } {
       advance(); // consume ':'
       tokens.push({ type: "PREFIXED", prefix: "", local: readLocalName(), line: startLine });
 
-    } else if (ch === "[") {
-      // Blank node property list — skip entirely, emit nothing
-      skipBlankNode();
+    } else if (ch === "[" || ch === "]") {
+      advance();
+      tokens.push({ type: "PUNCT", value: ch as "[" | "]", line: startLine });
 
     } else if (ch === "_" && peek(1) === ":") {
-      // Labeled blank node _:xxx — skip, emit nothing
       advance(); advance(); // consume '_:'
-      while (pos < input.length && !/\s/.test(peek()) && peek() !== ";" && peek() !== "," && peek() !== ".") {
-        advance();
+      let label = "";
+      while (pos < input.length && !/\s/.test(peek()) && peek() !== ";" && peek() !== "," && peek() !== "." && peek() !== "]" && peek() !== "[") {
+        label += advance();
       }
-      tokens.push({ type: "BARE", keyword: "_blank", line: startLine });
+      tokens.push({ type: "BARE", keyword: "_:" + label, line: startLine });
 
     } else if (/[a-zA-Z]/.test(ch)) {
       let word = "";
@@ -275,19 +260,21 @@ export function parseTurtle(input: string): ParseResult {
   const triples: ParsedTriple[] = [];
   const errors: ParseError[] = [...tokErrors];
   let blankNodeCount = 0;
+  let bnodeCounter = 0;
 
-  // Resolve a token to its full URI, or null if unresolvable
+  const generateBNode = () => "_:b" + (bnodeCounter++);
+
   const resolveNode = (tok: Token): string | null => {
     if (tok.type === "IRI") return tok.value;
     if (tok.type === "PREFIXED") {
       const ns = prefixes[tok.prefix];
       if (ns !== undefined) return ns + tok.local;
-      errors.push({ line: tok.line, message: `Unknown prefix: "${tok.prefix}:"` });
-      return `${tok.prefix}:${tok.local}`;
+      errors.push({ line: tok.line, message: "Unknown prefix: " + tok.prefix + ":" });
+      return tok.prefix + ":" + tok.local;
     }
     if (tok.type === "BARE") {
       if (tok.keyword === "a") return RDF_TYPE;
-      if (tok.keyword === "_blank") return null; // blank node — skip
+      if (tok.keyword.startsWith("_:")) return tok.keyword; // labeled blank node
     }
     return null;
   };
@@ -304,104 +291,14 @@ export function parseTurtle(input: string): ParseResult {
     return raw;
   };
 
-  // Skip forward to the next '.' to resync after a parse error
-  const skipToNextStatement = () => {
-    while (!stream.done()) {
-      const tok = stream.next()!;
-      if (tok.type === "PUNCT" && tok.value === ".") break;
-    }
-  };
-
-  while (!stream.done()) {
-    const tok = stream.peek()!;
-
-    // ── @prefix directive ───────────────────────────────────────────────────
-    if (tok.type === "AT_KW" && tok.keyword === "prefix") {
-      stream.next();
-      const nameTok = stream.next();
-      if (!nameTok || nameTok.type !== "PREFIXED") {
-        errors.push({ line: tok.line, message: "Invalid @prefix: expected prefix name" });
-        skipToNextStatement();
-        continue;
-      }
-      const iriTok = stream.next();
-      if (!iriTok || iriTok.type !== "IRI") {
-        errors.push({ line: tok.line, message: "Invalid @prefix: expected IRI" });
-        skipToNextStatement();
-        continue;
-      }
-      prefixes[nameTok.prefix] = iriTok.value;
-      stream.expectPunct(".");
-      continue;
-    }
-
-    // ── PREFIX directive (SPARQL style) ────────────────────────────────────
-    if (tok.type === "BARE" && tok.keyword === "PREFIX") {
-      stream.next();
-      const nameTok = stream.next();
-      if (!nameTok || nameTok.type !== "PREFIXED") {
-        errors.push({ line: tok.line, message: "Invalid PREFIX: expected prefix name" });
-        continue;
-      }
-      const iriTok = stream.next();
-      if (!iriTok || iriTok.type !== "IRI") {
-        errors.push({ line: tok.line, message: "Invalid PREFIX: expected IRI" });
-        continue;
-      }
-      prefixes[nameTok.prefix] = iriTok.value;
-      // No trailing '.' for SPARQL-style PREFIX
-      continue;
-    }
-
-    // ── @base directive ─────────────────────────────────────────────────────
-    if (tok.type === "AT_KW" && tok.keyword === "base") {
-      stream.next();
-      const iriTok = stream.next();
-      if (iriTok?.type === "IRI") {
-        baseUri = iriTok.value;
-        prefixes[""] = iriTok.value;
-      }
-      stream.expectPunct(".");
-      continue;
-    }
-
-    // ── BASE directive (SPARQL style) ───────────────────────────────────────
-    if (tok.type === "BARE" && tok.keyword === "BASE") {
-      stream.next();
-      const iriTok = stream.next();
-      if (iriTok?.type === "IRI") {
-        baseUri = iriTok.value;
-        prefixes[""] = iriTok.value;
-      }
-      continue;
-    }
-
-    // ── Blank node '_blank' token — skip ───────────────────────────────────
-    if (tok.type === "BARE" && tok.keyword === "_blank") {
-      stream.next();
-      skipToNextStatement();
-      blankNodeCount++;
-      continue;
-    }
-
-    // ── Triple statement ────────────────────────────────────────────────────
-    const subjectTok = stream.next()!;
-    const subject = resolveNode(subjectTok);
-    if (subject === null) {
-      skipToNextStatement();
-      continue;
-    }
-
-    // Parse predicate-object pairs for this subject
+  const parsePropertyList = (subject: string, endToken: "]" | ".") => {
     let inStatement = true;
-    while (inStatement) {
+    while (inStatement && !stream.done()) {
       const predTok = stream.peek();
-      if (!predTok) { inStatement = false; break; }
+      if (!predTok) break;
 
-      // Trailing ';' before '.' is valid (no predicate follows)
-      if (predTok.type === "PUNCT" && predTok.value === ".") {
+      if (predTok.type === "PUNCT" && predTok.value === endToken) {
         stream.next();
-        inStatement = false;
         break;
       }
       if (predTok.type === "PUNCT" && predTok.value === ";") {
@@ -413,24 +310,27 @@ export function parseTurtle(input: string): ParseResult {
       const predicate = resolveNode(predTok);
       if (predicate === null) {
         errors.push({ line: predTok.line, message: "Cannot resolve predicate" });
-        // Skip to ';' or '.'
         while (!stream.done()) {
           const t = stream.peek()!;
-          if (t.type === "PUNCT" && (t.value === ";" || t.value === ".")) break;
+          if (t.type === "PUNCT" && (t.value === ";" || t.value === endToken)) break;
           stream.next();
         }
         continue;
       }
 
-      // Parse one or more objects (separated by ',')
       let inObjectList = true;
-      while (inObjectList) {
+      while (inObjectList && !stream.done()) {
         const objTok = stream.peek();
-        if (!objTok) { inStatement = false; inObjectList = false; break; }
+        if (!objTok) break;
 
         if (objTok.type === "PUNCT") {
-          if (objTok.value === ".") { stream.next(); inStatement = false; inObjectList = false; break; }
-          if (objTok.value === ";") { stream.next(); inObjectList = false; break; }
+          if (objTok.value === endToken) {
+            stream.next();
+            inStatement = false;
+            inObjectList = false;
+            break;
+          }
+          if (objTok.value === ";") { stream.next(); break; }
           if (objTok.value === ",") { stream.next(); continue; }
         }
 
@@ -438,13 +338,14 @@ export function parseTurtle(input: string): ParseResult {
 
         if (objTok.type === "LITERAL") {
           triples.push({
-            s: subject,
-            p: predicate,
-            o: objTok.value,
-            isLiteral: true,
-            lang: objTok.lang,
-            datatype: objTok.datatypeRaw ? resolveDatatype(objTok.datatypeRaw) : undefined,
+            s: subject, p: predicate, o: objTok.value,
+            isLiteral: true, lang: objTok.lang,
+            datatype: objTok.datatypeRaw ? resolveDatatype(objTok.datatypeRaw) : undefined
           });
+        } else if (objTok.type === "PUNCT" && objTok.value === "[") {
+          const bnode = generateBNode();
+          triples.push({ s: subject, p: predicate, o: bnode, isLiteral: false });
+          parsePropertyList(bnode, "]");
         } else {
           const object = resolveNode(objTok);
           if (object !== null) {
@@ -452,22 +353,84 @@ export function parseTurtle(input: string): ParseResult {
           }
         }
 
-        // Peek at next token to decide what comes next
         const nxt = stream.peek();
-        if (!nxt) { inStatement = false; inObjectList = false; break; }
+        if (!nxt) break;
         if (nxt.type === "PUNCT") {
           if (nxt.value === ",") { stream.next(); continue; }
-          if (nxt.value === ";") { stream.next(); inObjectList = false; break; }
-          if (nxt.value === ".") { stream.next(); inStatement = false; inObjectList = false; break; }
+          if (nxt.value === ";") { stream.next(); break; }
+          if (nxt.value === endToken) {
+            stream.next();
+            inStatement = false;
+            inObjectList = false;
+            break;
+          }
         }
-        // No punctuation — implicitly end both loops (malformed but continue)
         inObjectList = false;
         inStatement = false;
       }
     }
+  };
+
+  const skipToNextStatement = () => {
+    while (!stream.done()) {
+      const tok = stream.next()!;
+      if (tok.type === "PUNCT" && tok.value === ".") break;
+    }
+  };
+
+  while (!stream.done()) {
+    const tok = stream.peek()!;
+    if (tok.type === "AT_KW" && tok.keyword === "prefix") {
+      stream.next();
+      const nameTok = stream.next();
+      if (!nameTok || nameTok.type !== "PREFIXED") { errors.push({ line: tok.line, message: "Invalid @prefix: expected prefix name" }); skipToNextStatement(); continue; }
+      const iriTok = stream.next();
+      if (!iriTok || iriTok.type !== "IRI") { errors.push({ line: tok.line, message: "Invalid @prefix: expected IRI" }); skipToNextStatement(); continue; }
+      prefixes[nameTok.prefix] = iriTok.value;
+      if (stream.peek()?.type === "PUNCT" && (stream.peek() as any)?.value === ".") stream.next();
+      continue;
+    }
+    if (tok.type === "BARE" && tok.keyword === "PREFIX") {
+      stream.next();
+      const nameTok = stream.next();
+      if (!nameTok || nameTok.type !== "PREFIXED") { errors.push({ line: tok.line, message: "Invalid PREFIX" }); continue; }
+      const iriTok = stream.next();
+      if (!iriTok || iriTok.type !== "IRI") { errors.push({ line: tok.line, message: "Invalid PREFIX" }); continue; }
+      prefixes[nameTok.prefix] = iriTok.value;
+      continue;
+    }
+    if (tok.type === "AT_KW" && tok.keyword === "base") {
+      stream.next();
+      const iriTok = stream.next();
+      if (iriTok?.type === "IRI") { baseUri = iriTok.value; prefixes[""] = iriTok.value; }
+      if (stream.peek()?.type === "PUNCT" && (stream.peek() as any)?.value === ".") stream.next();
+      continue;
+    }
+    if (tok.type === "BARE" && tok.keyword === "BASE") {
+      stream.next();
+      const iriTok = stream.next();
+      if (iriTok?.type === "IRI") { baseUri = iriTok.value; prefixes[""] = iriTok.value; }
+      continue;
+    }
+
+    if (tok.type === "PUNCT" && tok.value === "[") {
+       stream.next(); // consume '['
+       const bnode = generateBNode();
+       parsePropertyList(bnode, "]");
+       if (stream.peek()?.type === "PUNCT" && (stream.peek() as any)?.value === ".") stream.next();
+       continue;
+    }
+
+    const subjectTok = stream.next()!;
+    const subject = resolveNode(subjectTok);
+    if (subject === null) {
+      skipToNextStatement();
+      continue;
+    }
+
+    parsePropertyList(subject, ".");
   }
 
-  // If no @base, derive baseUri from the empty prefix
   if (!baseUri && prefixes[""]) {
     baseUri = prefixes[""];
   }
@@ -489,6 +452,7 @@ const P = {
   range:            RDFS + "range",
   subClassOf:       RDFS + "subClassOf",
   subPropertyOf:    RDFS + "subPropertyOf",
+  equivalentClass:  OWL + "equivalentClass",
   ontology:         OWL + "Ontology",
   owlClass:         OWL + "Class",
   objProp:          OWL + "ObjectProperty",
@@ -511,6 +475,37 @@ export function buildModelFromTriples(parsed: ParseResult): {
   unmappedTriples: UnmappedTriple[];
 } {
   const { triples, prefixes } = parsed;
+
+  // ── Step 0: Extract Restrictions ─────────────────────────────────────────
+  const mappedTripleSet = new Set<number>();
+  const restrictionNodes = new Map<string, Partial<OntologyRestriction>>();
+  const restrictionsByBNode = new Map<string, OntologyRestriction>();
+
+  triples.forEach((t, idx) => {
+    if (t.p === P.type && t.o === OWL + "Restriction") {
+      restrictionNodes.set(t.s, {});
+      mappedTripleSet.add(idx);
+    }
+  });
+
+  triples.forEach((t, idx) => {
+    const r = restrictionNodes.get(t.s);
+    if (r) {
+      if (t.p === OWL + "onProperty") { r.propertyUri = t.o; mappedTripleSet.add(idx); }
+      else if (t.p === OWL + "someValuesFrom") { r.type = "someValuesFrom"; r.value = t.o; mappedTripleSet.add(idx); }
+      else if (t.p === OWL + "allValuesFrom") { r.type = "allValuesFrom"; r.value = t.o; mappedTripleSet.add(idx); }
+      else if (t.p === OWL + "hasValue") { r.type = "hasValue"; r.value = t.o; mappedTripleSet.add(idx); }
+      else if (t.p === P.minCardinality) { r.type = "minCardinality"; r.value = t.o; mappedTripleSet.add(idx); }
+      else if (t.p === P.maxCardinality) { r.type = "maxCardinality"; r.value = t.o; mappedTripleSet.add(idx); }
+      else if (t.p === OWL + "exactCardinality") { r.type = "exactCardinality"; r.value = t.o; mappedTripleSet.add(idx); }
+    }
+  });
+
+  for (const [id, r] of restrictionNodes.entries()) {
+    if (r.propertyUri && r.type && r.value) {
+      restrictionsByBNode.set(id, r as OntologyRestriction);
+    }
+  }
 
   // ── Step 1: classify subjects by rdf:type ──────────────────────────────
   // A subject can have multiple rdf:type values (e.g., an individual typed to a class)
@@ -563,6 +558,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         descriptions: [],
         subClassOf: [],
         disjointWith: [],
+        restrictions: [],
         extraTriples: [],
       });
     } else if (type === P.objProp || type === P.dataProp || type === P.annotProp) {
@@ -610,6 +606,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         descriptions: [],
         subClassOf: [],
         disjointWith: [],
+        restrictions: [],
         extraTriples: [],
       });
     }
@@ -630,6 +627,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
         descriptions: [],
         subClassOf: [],
         disjointWith: [],
+        restrictions: [],
         extraTriples: [],
       });
     }
@@ -659,8 +657,7 @@ export function buildModelFromTriples(parsed: ParseResult): {
   }
 
   // ── Step 4: map all predicates onto the model ───────────────────────────
-  const mappedTripleSet = new Set<number>();
-
+  
   triples.forEach((t, idx) => {
     // rdf:type triples — mark as mapped; for promoted classes with non-standard
     // types (e.g., `:EncodedNucleicAcidAntigen a :Class`), preserve the original
@@ -700,7 +697,19 @@ export function buildModelFromTriples(parsed: ParseResult): {
       } else if (t.p === P.comment && t.isLiteral) {
         cls.descriptions.push({ value: t.o, lang: t.lang ?? "" });
       } else if (t.p === P.subClassOf && !t.isLiteral) {
-        if (!cls.subClassOf.includes(t.o)) cls.subClassOf.push(t.o);
+        if (restrictionsByBNode.has(t.o)) {
+          cls.restrictions.push(restrictionsByBNode.get(t.o)!);
+          mappedTripleSet.add(idx);
+        } else if (!cls.subClassOf.includes(t.o)) {
+          cls.subClassOf.push(t.o);
+        }
+      } else if (t.p === P.equivalentClass && !t.isLiteral) {
+        if (restrictionsByBNode.has(t.o)) {
+          cls.restrictions.push(restrictionsByBNode.get(t.o)!);
+          mappedTripleSet.add(idx);
+        } else {
+          cls.extraTriples.push({ predicate: t.p, object: t.o, isLiteral: false });
+        }
       } else if (t.p === P.disjointWith && !t.isLiteral) {
         if (!cls.disjointWith.includes(t.o)) cls.disjointWith.push(t.o);
       } else {

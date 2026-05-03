@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from "../../lib/store";
 import { compact } from "../../lib/uri-utils";
 import PropertyRow from './PropertyRow';
@@ -164,80 +165,112 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
       )}
 
       {/* Expanded body: properties + add-property form */}
-      {expanded && !editingClass && (
-        <div className="border-t border-th-border-muted pb-1">
-          {TYPE_ORDER.map((type) => {
-            const group = grouped.get(type) ?? [];
-            if (group.length === 0) return null;
-            return (
-              <div key={type}>
-                <div className={`px-3 pt-1.5 pb-0.5 text-2xs font-medium uppercase tracking-wide ${TYPE_COLOR[type]}`}>
-                  {TYPE_LABEL[type]}
+      <AnimatePresence initial={false}>
+        {expanded && !editingClass && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-th-border-muted pb-1">
+              {TYPE_ORDER.map((type) => {
+                const group = grouped.get(type) ?? [];
+                if (group.length === 0) return null;
+                return (
+                  <div key={type}>
+                    <div className={`px-3 pt-1.5 pb-0.5 text-2xs font-medium uppercase tracking-wide ${TYPE_COLOR[type]}`}>
+                      {TYPE_LABEL[type]}
+                    </div>
+                    {group.map((prop) => (
+                      <PropertyRow key={prop.id} property={prop} />
+                    ))}
+                  </div>
+                );
+              })}
+
+              {/* Restrictions */}
+              {(cls.restrictions ?? []).length > 0 && (
+                <div>
+                  <div className="px-3 pt-1.5 pb-0.5 text-2xs font-medium uppercase tracking-wide text-orange-400">
+                    Logical Restrictions
+                  </div>
+                  {(cls.restrictions ?? []).map((r, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-0.5">
+                      <span className="text-2xs font-medium text-th-fg-2">
+                        {compact(r.propertyUri, prefixes)}
+                      </span>
+                      <span className="text-2xs text-th-fg-4 px-1 rounded bg-th-hover border border-th-border-muted font-mono">
+                        {r.type}
+                      </span>
+                      <span className="text-2xs text-th-fg-3">
+                        {r.value.startsWith("http") ? compact(r.value, prefixes) : r.value}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                {group.map((prop) => (
-                  <PropertyRow key={prop.id} property={prop} />
-                ))}
-              </div>
-            );
-          })}
+              )}
 
-          {/* Extra triples (prov:wasQuotedFrom, skos:*, etc.) */}
-          {(cls.extraTriples ?? []).length > 0 && (
-            <div>
-              <div className="px-3 pt-1.5 pb-0.5 text-2xs font-medium uppercase tracking-wide text-th-fg-4">
-                Additional Annotations
-              </div>
-              {(cls.extraTriples ?? []).map((et, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-0.5">
-                  <span className="text-2xs font-medium text-th-fg-3">
-                    {compact(et.predicate, prefixes)}
-                  </span>
-                  <span className="text-2xs text-th-fg-4">→</span>
-                  <span className="text-2xs text-th-fg">
-                    {et.isLiteral
-                      ? `"${et.object}"${et.lang ? `@${et.lang}` : ''}${et.datatype ? `^^${compact(et.datatype, prefixes)}` : ''}`
-                      : compact(et.object, prefixes)}
-                  </span>
+              {/* Extra triples (prov:wasQuotedFrom, skos:*, etc.) */}
+              {(cls.extraTriples ?? []).length > 0 && (
+                <div>
+                  <div className="px-3 pt-1.5 pb-0.5 text-2xs font-medium uppercase tracking-wide text-th-fg-4">
+                    Additional Annotations
+                  </div>
+                  {(cls.extraTriples ?? []).map((et, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-0.5">
+                      <span className="text-2xs font-medium text-th-fg-3">
+                        {compact(et.predicate, prefixes)}
+                      </span>
+                      <span className="text-2xs text-th-fg-4">→</span>
+                      <span className="text-2xs text-th-fg">
+                        {et.isLiteral
+                          ? `"${et.object}"${et.lang ? `@${et.lang}` : ''}${et.datatype ? `^^${compact(et.datatype, prefixes)}` : ''}`
+                          : compact(et.object, prefixes)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {properties.length === 0 && (cls.extraTriples ?? []).length === 0 && !addingProperty && (
-            <p className="px-3 py-1.5 text-2xs text-th-fg-4">No properties</p>
-          )}
+              {properties.length === 0 && (cls.extraTriples ?? []).length === 0 && !addingProperty && (
+                <p className="px-3 py-1.5 text-2xs text-th-fg-4">No properties</p>
+              )}
 
-          {/* Add-property form */}
-          {addingProperty ? (
-            <div className="px-3 pt-1.5">
-              <PropertyForm
-                defaultDomainUri={cls.uri}
-                onDone={() => setAddingProperty(false)}
-              />
-            </div>
-          ) : (
-            <div className="ml-3 mt-1 flex items-center gap-2">
-              <button
-                onClick={() => setAddingProperty(true)}
-                className="flex items-center gap-1 text-2xs text-th-fg-4 hover:text-blue-400"
-              >
-                <Plus size={11} />
-                Add property
-              </button>
-              {clipboard?.type === "property" && (
-                <button
-                  onClick={() => pasteClipboard({ domainUri: cls.uri })}
-                  className="flex items-center gap-1 text-2xs text-purple-500 hover:text-purple-400"
-                  title={`Paste "${clipboard.property.labels[0]?.value || clipboard.property.localName}" into this class`}
-                >
-                  <Clipboard size={11} />
-                  Paste property
-                </button>
+              {/* Add-property form */}
+              {addingProperty ? (
+                <div className="px-3 pt-1.5">
+                  <PropertyForm
+                    defaultDomainUri={cls.uri}
+                    onDone={() => setAddingProperty(false)}
+                  />
+                </div>
+              ) : (
+                <div className="ml-3 mt-1 flex items-center gap-2">
+                  <button
+                    onClick={() => setAddingProperty(true)}
+                    className="flex items-center gap-1 text-2xs text-th-fg-4 hover:text-blue-400"
+                  >
+                    <Plus size={11} />
+                    Add property
+                  </button>
+                  {clipboard?.type === "property" && (
+                    <button
+                      onClick={() => pasteClipboard({ domainUri: cls.uri })}
+                      className="flex items-center gap-1 text-2xs text-purple-500 hover:text-purple-400"
+                      title={`Paste "${clipboard.property.labels[0]?.value || clipboard.property.localName}" into this class`}
+                    >
+                      <Clipboard size={11} />
+                      Paste property
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

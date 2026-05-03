@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronRight, Pencil, Check, X, Trash2, Plus } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { compact, buildUri, toCamelCase } from "../../lib/uri-utils";
@@ -230,89 +231,99 @@ export default function IndividualCard({ individual, defaultExpanded = false }: 
       )}
 
       {/* Expanded body */}
-      {expanded && !editingMeta && (
-        <div className="border-t border-th-border-muted pb-1">
-          {Array.from(schemaProps.entries()).map(([classUri, props]) => {
-            const clsLabel = allClasses.find((cl) => cl.uri === classUri)?.labels[0]?.value || c(classUri);
-            return (
-              <div key={classUri}>
-                <div className="px-3 pt-1.5 pb-0.5 text-xs font-medium uppercase tracking-wide text-purple-400">
-                  {clsLabel} properties
+      <AnimatePresence initial={false}>
+        {expanded && !editingMeta && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-th-border-muted pb-1">
+              {Array.from(schemaProps.entries()).map(([classUri, props]) => {
+                const clsLabel = allClasses.find((cl) => cl.uri === classUri)?.labels[0]?.value || c(classUri);
+                return (
+                  <div key={classUri}>
+                    <div className="px-3 pt-1.5 pb-0.5 text-xs font-medium uppercase tracking-wide text-purple-400">
+                      {clsLabel} properties
+                    </div>
+                    {props.map((schemaProp) => {
+                      const entries = valuesByPropUri.get(schemaProp.uri) ?? [];
+                      entries.forEach((e) => usedIndices.add(e.originalIndex));
+                      if (entries.length === 0) {
+                        return (
+                          <div key={schemaProp.id} className="flex items-center gap-2 px-2 py-1">
+                            <span className={`text-xs font-medium ${propTypeColor(schemaProp.uri)}`}>{schemaProp.labels[0]?.value || schemaProp.localName}</span>
+                            <span className="text-xs text-th-fg-4">→</span>
+                            <span className="text-xs italic text-th-fg-4">(empty)</span>
+                          </div>
+                        );
+                      }
+                      return entries.map((entry) => renderPropertyValue(entry.pv, entry.originalIndex));
+                    })}
+                  </div>
+                );
+              })}
+
+              {(() => {
+                const remaining = individual.propertyValues.map((pv, idx) => ({ pv, idx })).filter(({ idx }) => !usedIndices.has(idx));
+                if (remaining.length === 0) return null;
+                return (
+                  <div>
+                    {schemaProps.size > 0 && (
+                      <div className="px-3 pt-1.5 pb-0.5 text-xs font-medium uppercase tracking-wide text-th-fg-4">Other</div>
+                    )}
+                    {remaining.map(({ pv, idx }) => renderPropertyValue(pv, idx))}
+                  </div>
+                );
+              })()}
+
+              {individual.propertyValues.length === 0 && !adding && (
+                <p className="px-3 py-1.5 text-xs text-th-fg-4">No property values</p>
+              )}
+
+              {adding ? (
+                <div className="mx-3 mt-1 space-y-1.5 rounded border border-th-border bg-th-base p-2">
+                  <select
+                    value={newPropUri}
+                    onChange={(e) => setNewPropUri(e.target.value)}
+                    className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Select property…</option>
+                    {allProperties.map((p) => (
+                      <option key={p.id} value={p.uri}>{p.labels[0]?.value || p.localName} ({p.type.replace("owl:", "")})</option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={newPropValue}
+                      onChange={(e) => setNewPropValue(e.target.value)}
+                      placeholder="Value"
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") setAdding(false); }}
+                      className="flex-1 rounded bg-th-input px-2 py-1 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <label className="flex items-center gap-1 text-xs text-th-fg-3">
+                      <input type="checkbox" checked={newPropIsLiteral} onChange={(e) => setNewPropIsLiteral(e.target.checked)} className="rounded" />
+                      Literal
+                    </label>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={handleAdd} className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-blue-500">Add</button>
+                    <button onClick={() => setAdding(false)} className="rounded bg-th-hover px-2 py-0.5 text-xs text-th-fg-2 hover:bg-th-border">Cancel</button>
+                  </div>
                 </div>
-                {props.map((schemaProp) => {
-                  const entries = valuesByPropUri.get(schemaProp.uri) ?? [];
-                  entries.forEach((e) => usedIndices.add(e.originalIndex));
-                  if (entries.length === 0) {
-                    return (
-                      <div key={schemaProp.id} className="flex items-center gap-2 px-2 py-1">
-                        <span className={`text-xs font-medium ${propTypeColor(schemaProp.uri)}`}>{schemaProp.labels[0]?.value || schemaProp.localName}</span>
-                        <span className="text-xs text-th-fg-4">→</span>
-                        <span className="text-xs italic text-th-fg-4">(empty)</span>
-                      </div>
-                    );
-                  }
-                  return entries.map((entry) => renderPropertyValue(entry.pv, entry.originalIndex));
-                })}
-              </div>
-            );
-          })}
-
-          {(() => {
-            const remaining = individual.propertyValues.map((pv, idx) => ({ pv, idx })).filter(({ idx }) => !usedIndices.has(idx));
-            if (remaining.length === 0) return null;
-            return (
-              <div>
-                {schemaProps.size > 0 && (
-                  <div className="px-3 pt-1.5 pb-0.5 text-xs font-medium uppercase tracking-wide text-th-fg-4">Other</div>
-                )}
-                {remaining.map(({ pv, idx }) => renderPropertyValue(pv, idx))}
-              </div>
-            );
-          })()}
-
-          {individual.propertyValues.length === 0 && !adding && (
-            <p className="px-3 py-1.5 text-xs text-th-fg-4">No property values</p>
-          )}
-
-          {adding ? (
-            <div className="mx-3 mt-1 space-y-1.5 rounded border border-th-border bg-th-base p-2">
-              <select
-                value={newPropUri}
-                onChange={(e) => setNewPropUri(e.target.value)}
-                className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">Select property…</option>
-                {allProperties.map((p) => (
-                  <option key={p.id} value={p.uri}>{p.labels[0]?.value || p.localName} ({p.type.replace("owl:", "")})</option>
-                ))}
-              </select>
-              <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={newPropValue}
-                  onChange={(e) => setNewPropValue(e.target.value)}
-                  placeholder="Value"
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") setAdding(false); }}
-                  className="flex-1 rounded bg-th-input px-2 py-1 text-xs text-th-fg placeholder-th-fg-4 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <label className="flex items-center gap-1 text-xs text-th-fg-3">
-                  <input type="checkbox" checked={newPropIsLiteral} onChange={(e) => setNewPropIsLiteral(e.target.checked)} className="rounded" />
-                  Literal
-                </label>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={handleAdd} className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-blue-500">Add</button>
-                <button onClick={() => setAdding(false)} className="rounded bg-th-hover px-2 py-0.5 text-xs text-th-fg-2 hover:bg-th-border">Cancel</button>
-              </div>
+              ) : (
+                <button onClick={() => setAdding(true)} className="ml-3 mt-1 flex items-center gap-1 text-xs text-th-fg-4 hover:text-blue-400">
+                  <Plus size={11} />
+                  Add property value
+                </button>
+              )}
             </div>
-          ) : (
-            <button onClick={() => setAdding(true)} className="ml-3 mt-1 flex items-center gap-1 text-xs text-th-fg-4 hover:text-blue-400">
-              <Plus size={11} />
-              Add property value
-            </button>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

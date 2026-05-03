@@ -25,4 +25,29 @@ describe('Turtle Parser', () => {
     expect(model.classes.length).toBeGreaterThan(0);
     expect(model.properties.length).toBeGreaterThan(0);
   });
+  it('should parse OWL restrictions correctly', () => {
+    const turtle = `
+      @prefix : <http://example.org/> .
+      @prefix owl: <http://www.w3.org/2002/07/owl#> .
+      @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+      :Pizza a owl:Class ;
+        rdfs:subClassOf [
+          a owl:Restriction ;
+          owl:onProperty :hasTopping ;
+          owl:someValuesFrom :Cheese
+        ] .
+    `;
+    const parsed = parseTurtle(turtle);
+    const model = buildModelFromTriples(parsed);
+    
+    const pizzaClass = model.classes.find(c => c.localName === 'Pizza');
+    expect(pizzaClass).toBeDefined();
+    expect(pizzaClass!.restrictions.length).toBe(1);
+    
+    const restriction = pizzaClass!.restrictions[0];
+    expect(restriction.propertyUri).toBe('http://example.org/hasTopping');
+    expect(restriction.type).toBe('someValuesFrom');
+    expect(restriction.value).toBe('http://example.org/Cheese');
+  });
 });

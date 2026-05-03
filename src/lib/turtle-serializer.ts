@@ -152,6 +152,19 @@ export function serializeToTurtle(ontology: Ontology): string {
     for (const disjUri of cls.disjointWith ?? []) {
       pairs.push(["owl:disjointWith", c(disjUri)]);
     }
+    for (const r of cls.restrictions ?? []) {
+       const rPairs: string[] = [];
+       rPairs.push(`a owl:Restriction`);
+       rPairs.push(`owl:onProperty ${c(r.propertyUri)}`);
+       if (r.type === "someValuesFrom") rPairs.push(`owl:someValuesFrom ${c(r.value)}`);
+       else if (r.type === "allValuesFrom") rPairs.push(`owl:allValuesFrom ${c(r.value)}`);
+       else if (r.type === "hasValue") rPairs.push(`owl:hasValue ${c(r.value)}`);
+       else if (r.type === "minCardinality") rPairs.push(`owl:minCardinality "${r.value}"^^xsd:nonNegativeInteger`);
+       else if (r.type === "maxCardinality") rPairs.push(`owl:maxCardinality "${r.value}"^^xsd:nonNegativeInteger`);
+       else if (r.type === "exactCardinality") rPairs.push(`owl:cardinality "${r.value}"^^xsd:nonNegativeInteger`);
+       
+       pairs.push(["rdfs:subClassOf", `[ ${rPairs.join(" ; ")} ]`]);
+    }
     serializeExtraTriples(cls.extraTriples ?? [], pairs);
     const block = buildBlock(pairs);
     lines.push(`${c(cls.uri)} ${block[0]!}`);

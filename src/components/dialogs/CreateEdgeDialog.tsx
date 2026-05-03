@@ -42,10 +42,13 @@ export default function CreateEdgeDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+      />
 
       {/* Dialog */}
-      <div className="relative z-10 w-full max-w-sm rounded-lg border border-th-border bg-th-surface shadow-xl">
+      <div className="relative z-10 w-full max-w-md rounded-lg border border-th-border bg-th-surface/90 backdrop-blur-md shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-th-border px-4 py-3">
           <h2 className="text-sm font-semibold text-th-fg">Add Relationship</h2>
