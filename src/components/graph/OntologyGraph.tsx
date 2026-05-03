@@ -916,13 +916,28 @@ export default function OntologyGraph({ onClose }: Props) {
       {/* ── Floating editor panels ───────────────────────────────────── */}
       {floatingPanel && (() => {
         const close = () => setFloatingPanel(null);
+        // Clamp so the panel's bottom never exceeds the container.
+        // We don't know the panel's render height upfront, so we express it as:
+        //   top = min(floatingPanel.y, containerHeight - PANEL_MAX_H - toolbar)
+        // by using bottom = containerHeight - (floatingPanel.y + PANEL_MAX_H) when it would clip,
+        // or simply anchor "bottom" from the container edge when y is too large.
+        const PANEL_W = 370;
+        const PANEL_MAX_H = 560; // generous max so Save is always reachable
+        const containerH = containerRef.current?.clientHeight ?? 600;
+        const containerW = containerRef.current?.clientWidth  ?? 900;
+        const toolbar    = 44; // approx toolbar height
+        const clampedX   = Math.min(Math.max(floatingPanel.x, 8), containerW - PANEL_W - 8);
+        const clampedY   = Math.min(Math.max(floatingPanel.y, toolbar + 4), containerH - PANEL_MAX_H - 8);
+
         const panelStyle: React.CSSProperties = {
           position: "absolute",
-          left: floatingPanel.x,
-          top: floatingPanel.y,
-          width: 370,
+          left: clampedX,
+          top: clampedY,
+          width: PANEL_W,
           zIndex: 50,
-          maxHeight: "calc(100% - 80px)",
+          maxHeight: containerH - clampedY - 8,
+          display: "flex",
+          flexDirection: "column",
         };
         const headerCls = "flex items-center justify-between rounded-t border-b border-th-border-muted bg-th-surface px-3 py-1.5";
 
@@ -935,7 +950,7 @@ export default function OntologyGraph({ onClose }: Props) {
                 <span className="text-xs font-semibold text-th-fg">Edit Class · {cls.labels[0]?.value || cls.localName}</span>
                 <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <ClassForm existing={cls} onDone={close} />
               </div>
             </div>
@@ -951,7 +966,7 @@ export default function OntologyGraph({ onClose }: Props) {
                 </span>
                 <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <ClassForm onDone={close} />
               </div>
             </div>
@@ -967,7 +982,7 @@ export default function OntologyGraph({ onClose }: Props) {
                 <span className="text-xs font-semibold text-th-fg">Edit Property · {prop.labels[0]?.value || prop.localName}</span>
                 <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <PropertyForm existing={prop} onDone={close} />
               </div>
             </div>
@@ -983,7 +998,7 @@ export default function OntologyGraph({ onClose }: Props) {
                 </span>
                 <button onClick={close} className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"><X size={13} /></button>
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <PropertyForm defaultDomainUri={floatingPanel.defaultDomainUri} onDone={close} />
               </div>
             </div>

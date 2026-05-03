@@ -47,6 +47,8 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
   const [ranges, setRanges] = useState<string[]>(existing?.ranges ?? []);
   const [rangeInput, setRangeInput] = useState(""); // for annotation free-text input
   const [subPropertyOf, setSubPropertyOf] = useState<string[]>(existing?.subPropertyOf ?? []);
+  // "pills" = current tag-buttons, "dropdown" = compact searchable select
+  const [propPickerMode, setPropPickerMode] = useState<"pills" | "dropdown">("pills");
   const [inverseOf, setInverseOf] = useState(existing?.inverseOf ?? "");
   const [minCard, setMinCard] = useState(existing?.minCardinality !== undefined ? String(existing.minCardinality) : "");
   const [maxCard, setMaxCard] = useState(existing?.maxCardinality !== undefined ? String(existing.maxCardinality) : "");
@@ -379,27 +381,73 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
       {/* subPropertyOf */}
       {sameTypeProps.length > 0 && (
         <div>
-          <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-th-fg-3">
-            subPropertyOf
-          </label>
-          <div className="flex flex-wrap gap-1">
-            {sameTypeProps.map((prop) => {
-              const selected = subPropertyOf.includes(prop.uri);
-              return (
-                <button
-                  key={prop.id}
-                  onClick={() => toggleSubPropOf(prop.uri)}
-                  className={`rounded px-2 py-0.5 text-2xs ${
-                    selected
-                      ? "bg-blue-600 text-white"
-                      : "bg-th-hover text-th-fg-3 hover:bg-th-border"
-                  }`}
-                >
-                  {prop.labels[0]?.value || prop.localName}
-                </button>
-              );
-            })}
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-2xs font-medium uppercase tracking-wide text-th-fg-3">
+              subPropertyOf
+              {subPropertyOf.length > 0 && (
+                <span className="ml-1.5 rounded bg-blue-600/20 px-1.5 text-2xs font-normal text-blue-400">{subPropertyOf.length}</span>
+              )}
+            </label>
+            <div className="flex overflow-hidden rounded border border-th-border text-2xs">
+              <button
+                onClick={() => setPropPickerMode("pills")}
+                className={`px-2 py-0.5 ${propPickerMode === "pills" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
+              >Pills</button>
+              <button
+                onClick={() => setPropPickerMode("dropdown")}
+                className={`border-l border-th-border px-2 py-0.5 ${propPickerMode === "dropdown" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
+              >Dropdown</button>
+            </div>
           </div>
+
+          {propPickerMode === "pills" ? (
+            <div className="flex flex-wrap gap-1">
+              {sameTypeProps.map((prop) => {
+                const selected = subPropertyOf.includes(prop.uri);
+                return (
+                  <button
+                    key={prop.id}
+                    onClick={() => toggleSubPropOf(prop.uri)}
+                    className={`rounded px-2 py-0.5 text-2xs ${
+                      selected
+                        ? "bg-blue-600 text-white"
+                        : "bg-th-hover text-th-fg-3 hover:bg-th-border"
+                    }`}
+                  >
+                    {prop.labels[0]?.value || prop.localName}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {subPropertyOf.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {subPropertyOf.map((uri) => {
+                    const p = sameTypeProps.find((sp) => sp.uri === uri);
+                    return (
+                      <span key={uri} className="flex items-center gap-1 rounded-full bg-blue-700/30 px-2 py-0.5 text-2xs text-blue-300">
+                        {p?.labels[0]?.value || p?.localName || uri.split(/[#/]/).pop()}
+                        <button onClick={() => toggleSubPropOf(uri)} className="opacity-60 hover:opacity-100">×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) toggleSubPropOf(e.target.value); }}
+                className="w-full rounded bg-th-input px-2 py-1 text-xs text-th-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">+ Add parent property…</option>
+                {sameTypeProps
+                  .filter((p) => !subPropertyOf.includes(p.uri))
+                  .map((p) => (
+                    <option key={p.id} value={p.uri}>{p.labels[0]?.value || p.localName}</option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
