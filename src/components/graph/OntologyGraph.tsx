@@ -878,7 +878,10 @@ export default function OntologyGraph({ onClose }: Props) {
               const link = simLinksRef.current.find((l) => l.id === contextMenu.linkId);
               if (!link) return null;
               // Derive property id from link id: "obj-<propId>", "dtype-<propId>", "annot-<propId>"
-              const propId = link.id.replace(/^(obj|dtype|annot|inv)-/, "");
+              // Link IDs are: "obj-<propId>-<rngId>", "dtype-<propId>-<rangeUri>", etc.
+              // prop.id is always the first 8-char hex segment after the prefix.
+              const afterPrefix = link.id.replace(/^(obj|dtype|annot|inv)-/, "");
+              const propId = afterPrefix.split("-")[0]!;
               const prop = properties.find((p) => p.id === propId);
               return (
                 <>
