@@ -126,6 +126,8 @@ export default function OntologyGraph({ onClose }: Props) {
   const [hoveredId,      setHoveredId]      = useState<string | null>(null);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [editPanelPos,   setEditPanelPos]   = useState({ x: 0, y: 0 });
+  const [showDatatypes, setShowDatatypes] = useState(true);
+  const [showAnnotations, setShowAnnotations] = useState(true);
 
   // ── Tick handler (rAF-batched) ────────────────────────────────────
   const scheduleTick = useCallback(() => {
@@ -171,9 +173,11 @@ export default function OntologyGraph({ onClose }: Props) {
     });
 
     const dtypeUriSet = new Set<string>();
-    for (const prop of properties) {
-      if (prop.type === "owl:DatatypeProperty" && prop.domainUri && prop.range) {
-        dtypeUriSet.add(prop.range);
+    if (showDatatypes) {
+      for (const prop of properties) {
+        if (prop.type === "owl:DatatypeProperty" && prop.domainUri && prop.range) {
+          dtypeUriSet.add(prop.range);
+        }
       }
     }
     const dtypeNodes: SimNode[] = [...dtypeUriSet].map((uri) => {
@@ -221,23 +225,52 @@ export default function OntologyGraph({ onClose }: Props) {
       }
     }
 
-    for (const prop of properties) {
-      if (prop.type !== "owl:DatatypeProperty" || !prop.domainUri || !prop.range) continue;
-      const dom = classes.find((c) => c.uri === prop.domainUri);
-      if (!dom) continue;
-      links.push({ id: `dtype-${prop.id}`, source: dom.id, target: `dtype:${prop.range}`, label: prop.labels[0]?.value || prop.localName, type: "datatypeProperty" });
+    if (showDatatypes) {
+      for (const prop of properties) {
+        if (prop.type !== "owl:DatatypeProperty" || !prop.domainUri || !prop.range) continue;
+        const dom = classes.find((c) => c.uri === prop.domainUri);
+        if (!dom) continue;
+        links.push({ id: `dtype-${prop.id}`, source: dom.id, target: `dtype:${prop.range}`, label: prop.labels[0]?.value || prop.localName, type: "datatypeProperty" });
+      }
     }
 
-    for (const prop of properties) {
-      if (prop.type !== "owl:AnnotationProperty" || !prop.domainUri || !prop.range) continue;
-      const dom = classes.find((c) => c.uri === prop.domainUri);
-      const rng = classes.find((c) => c.uri === prop.range);
-      if (!dom || !rng) continue;
-      links.push({ id: `annot-${prop.id}`, source: dom.id, target: rng.id, label: prop.labels[0]?.value || prop.localName, type: "annotationProperty" });
+    if (showAnnotations) {
+      for (const prop of properties) {
+        if (prop.type !== "owl:AnnotationProperty" || !prop.domainUri || !prop.range) continue;
+        const dom = classes.find((c) => c.uri === prop.domainUri);
+        const rng = classes.find((c) => c.uri === prop.range);
+        if (!dom || !rng) continue;
+        links.push({ id: `annot-${prop.id}`, source: dom.id, target: rng.id, label: prop.labels[0]?.value || prop.localName, type: "annotationProperty" });
+      }
     }
 
     // Stop old sim cleanly
     simRef.current?.stop();
+
+    // Hierarchical depth computation
+    const childrenMap = new Map<string, string[]>();
+    for (const cls of classes) {
+      if (!childrenMap.has(cls.uri)) childrenMap.set(cls.uri, []);
+      for (const parentUri of cls.subClassOf) {
+        if (!childrenMap.has(parentUri)) childrenMap.set(parentUri, []);
+        childrenMap.get(parentUri)!.push(cls.uri);
+      }
+    }
+    const roots = classes.filter((c) => c.subClassOf.length === 0);
+    const depthMap = new Map<string, number>();
+    const queue = roots.map((c) => ({ uri: c.uri, depth: 0 }));
+    const visited = new Set<string>();
+    
+    while (queue.length > 0) {
+      const { uri, depth } = queue.shift()!;
+      if (visited.has(uri)) continue;
+      visited.add(uri);
+      depthMap.set(uri, Math.max(depthMap.get(uri) ?? 0, depth));
+      const children = childrenMap.get(uri) ?? [];
+      for (const childUri of children) {
+        queue.push({ uri: childUri, depth: depth + 1 });
+      }
+    }
 
     // Compute degree so orphan nodes can get stronger gravity
     const degree = new Map<string, number>(allNodes.map((n) => [n.id, 0]));
@@ -247,29 +280,55 @@ export default function OntologyGraph({ onClose }: Props) {
       degree.set(s, (degree.get(s) ?? 0) + 1);
       degree.set(t, (degree.get(t) ?? 0) + 1);
     }
-    // Orphan gravity: unconnected nodes get ~3× stronger pull so they stay near the cluster
-    const gravity = (n: SimNode) => (degree.get(n.id) ?? 0) === 0 ? 0.14 : 0.05;
+    
+    const N = allNodes.length;
+    // Base repulsion increases with node count. Made much stronger to prevent clustering.
+    const baseRepulsion = -2500 - N * 80;
+    // Distance max scales up so distant clusters don't collapse inward
+    const distanceMax = Math.max(3000, N * 150);
+
+    // Gravity weakens slightly for very large graphs to allow spreading out
+    const gravityForce = N > 50 ? 0.015 : 0.04;
+    const orphanGravity = 0.08;
+    const getGravity = (n: SimNode) => (degree.get(n.id) ?? 0) === 0 ? orphanGravity : gravityForce;
+
+    const maxDepth = Math.max(0, ...Array.from(depthMap.values()));
+    const ySpacing = 350; // Increased spacing between hierarchical layers
+    const yOffset = -(maxDepth * ySpacing) / 2;
 
     simNodesRef.current = allNodes;
     simLinksRef.current = links;
     nodeMapRef.current  = newMap;
 
     const sim = forceSimulation<SimNode>(allNodes)
-      .force("charge",  forceManyBody<SimNode>().strength(-1100).distanceMax(700))
+      .force("charge",  forceManyBody<SimNode>().strength(baseRepulsion).distanceMax(distanceMax))
       .force("link",    d3ForceLink<SimNode, D3Link>(links)
         .id((d) => d.id)
-        .distance((l) => l.type === "subClassOf" ? 140 : l.type === "datatypeProperty" ? 210 : 230)
+        .distance((l) => {
+          // Drastically increased base distances to prevent edge labels overlapping
+          let dist = l.type === "subClassOf" ? 220 : l.type === "datatypeProperty" ? 300 : 350;
+          return dist + (N > 30 ? 80 : 0); // extra distance for big graphs
+        })
         .strength((l)  => l.type === "subClassOf" ? 0.8 : 0.35))
-      .force("x",       forceX<SimNode>(0).strength(gravity))
-      .force("y",       forceY<SimNode>(0).strength(gravity))
-      .force("collide", forceCollide<SimNode>((n) => n.kind === "class" ? classR(n) + 30 : 58).strength(0.85))
+      .force("x",       forceX<SimNode>(0).strength(getGravity))
+      .force("y",       forceY<SimNode>((n) => {
+         if (n.kind === "class") {
+           const d = depthMap.get(n.uri) ?? 0;
+           return yOffset + d * ySpacing;
+         }
+         return 0; // Datatypes drift
+      }).strength((n) => {
+         const g = getGravity(n);
+         return n.kind === "class" ? Math.max(g, 0.4) : g; // Strongly pull classes into top-down bands
+      }))
+      .force("collide", forceCollide<SimNode>((n) => (n.kind === "class" ? classR(n) + 80 : 80) + (N > 30 ? 40 : 0)).strength(0.85))
       .alphaDecay(0.015)
       .velocityDecay(0.4)
       .on("tick", scheduleTick);
 
     simRef.current = sim;
     forceRedraw((n) => n + 1);
-  }, [classes, properties, activeOntology, scheduleTick]);
+  }, [classes, properties, activeOntology, scheduleTick, showDatatypes, showAnnotations]);
 
   useEffect(() => {
     buildSimulation();
@@ -605,6 +664,14 @@ export default function OntologyGraph({ onClose }: Props) {
         </div>
 
         <div className="ml-auto flex items-center gap-1">
+          <label className="mr-3 flex items-center gap-1.5 text-2xs text-th-fg-3">
+            <input type="checkbox" checked={showDatatypes} onChange={(e) => setShowDatatypes(e.target.checked)} className="accent-th-fg" />
+            Datatypes
+          </label>
+          <label className="mr-3 flex items-center gap-1.5 text-2xs text-th-fg-3">
+            <input type="checkbox" checked={showAnnotations} onChange={(e) => setShowAnnotations(e.target.checked)} className="accent-th-fg" />
+            Annotations
+          </label>
           <span className="mr-2 text-2xs text-th-fg-4" title="Drag to pin a node in place. Shift+click to unpin. Reheat unpins all.">
             drag=pin · ⇧click=unpin
           </span>

@@ -33,6 +33,8 @@ export interface LayoutOptions {
   springK?: number;
   /** Number of simulation iterations. */
   iterations?: number;
+  /** Minimum distance to enforce between nodes. */
+  minDist?: number;
 }
 
 // ── Crossing geometry ────────────────────────────────────────────
@@ -83,7 +85,8 @@ export function computeLayout(
     repulsion = 28000,
     springK = 0.04,
     iterations = 300,
-  } = options;
+    minDist = 150,
+  } = options as LayoutOptions & { minDist?: number };
 
   const cx = width / 2;
   const cy = height / 2;
@@ -136,7 +139,6 @@ export function computeLayout(
   const nodeMap = new Map<string, GraphNode>(nodes.map(n => [n.id, n]));
 
   // ── Step 2: Force simulation ────────────────────────────────────
-  const MIN_DIST = 150;
   const damping = 0.85;
   const gravity = 0.0008;
 
@@ -150,7 +152,7 @@ export function computeLayout(
         let dx = b.x - a.x;
         let dy = b.y - a.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
-        const eff = Math.max(dist, MIN_DIST * 0.5);
+        const eff = Math.max(dist, minDist * 0.5);
         const force = (repulsion * alpha) / (eff * eff);
         dx = (dx / dist) * force;
         dy = (dy / dist) * force;
@@ -192,8 +194,8 @@ export function computeLayout(
         const a = nodes[i]!, b = nodes[j]!;
         const dx = b.x - a.x, dy = b.y - a.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
-        if (dist < MIN_DIST) {
-          const push = (MIN_DIST - dist) / 2;
+        if (dist < minDist) {
+          const push = (minDist - dist) / 2;
           const ux = dx / dist, uy = dy / dist;
           a.x -= ux * push; a.y -= uy * push;
           b.x += ux * push; b.y += uy * push;
