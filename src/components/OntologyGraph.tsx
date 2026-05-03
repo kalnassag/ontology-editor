@@ -302,6 +302,8 @@ export default function OntologyGraph({ onClose }: Props) {
   };
 
   const reheat = () => {
+    // Unpin everything so the simulation can fully reorganise
+    for (const node of simNodesRef.current) { node.fx = null; node.fy = null; }
     simRef.current?.alpha(0.8).restart();
   };
 
@@ -322,10 +324,18 @@ export default function OntologyGraph({ onClose }: Props) {
     if (nodeId) {
       const node = nodeMapRef.current.get(nodeId);
       if (!node) return;
-      dragNodeRef.current  = node;
+      // Shift+click: toggle pin — unpin a pinned node and let it rejoin the simulation
+      if (e.shiftKey) {
+        node.fx = null;
+        node.fy = null;
+        simRef.current?.alpha(0.3).restart();
+        scheduleTick();
+        e.preventDefault();
+        return;
+      }
+      dragNodeRef.current = node;
       node.fx = node.x ?? 0;
       node.fy = node.y ?? 0;
-      // Reheat so neighbours respond
       simRef.current?.alphaTarget(0.3).restart();
       e.preventDefault();
     } else {
@@ -353,9 +363,10 @@ export default function OntologyGraph({ onClose }: Props) {
 
   const handleMouseUp = () => {
     if (dragNodeRef.current) {
-      // Unpin — let the simulation settle
-      dragNodeRef.current.fx = null;
-      dragNodeRef.current.fy = null;
+      // Pin node at released position — d3 will ignore all forces for pinned nodes,
+      // so the user's manual arrangement is preserved. Shift+click to unpin.
+      dragNodeRef.current.fx = dragNodeRef.current.x;
+      dragNodeRef.current.fy = dragNodeRef.current.y;
       simRef.current?.alphaTarget(0).restart();
       dragNodeRef.current = null;
     }
@@ -488,10 +499,11 @@ export default function OntologyGraph({ onClose }: Props) {
 
   // ── Class node ────────────────────────────────────────────────────
   const renderClassNode = useCallback((node: SimNode) => {
-    const x    = node.x ?? 0, y = node.y ?? 0;
-    const r    = classR(node);
+    const x     = node.x ?? 0, y = node.y ?? 0;
+    const r     = classR(node);
     const isHov = hoveredId === node.id;
-    const lbl  = node.label.length > 14 ? node.label.slice(0, 13) + "…" : node.label;
+    const isPinned = node.fx != null;
+    const lbl   = node.label.length > 14 ? node.label.slice(0, 13) + "…" : node.label;
     return (
       <g key={node.id} data-node-id={node.id}
         style={{ cursor: dragNodeRef.current?.id === node.id ? "grabbing" : "grab" }}
@@ -509,6 +521,11 @@ export default function OntologyGraph({ onClose }: Props) {
             fill="#3355aa" fontSize={9} fontFamily={FONT} pointerEvents="none">
             {node.propertyCount} prop{node.propertyCount !== 1 ? "s" : ""}
           </text>
+        )}
+        {/* Pin indicator — small filled dot when node is manually fixed */}
+        {isPinned && (
+          <circle cx={x + r * 0.72} cy={y - r * 0.72} r={4}
+            fill="#335599" stroke="white" strokeWidth={1} pointerEvents="none" />
         )}
       </g>
     );
@@ -588,7 +605,10 @@ export default function OntologyGraph({ onClose }: Props) {
         </div>
 
         <div className="ml-auto flex items-center gap-1">
-          <button onClick={reheat}         className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Reheat layout"><RefreshCw size={13} /></button>
+          <span className="mr-2 text-2xs text-th-fg-4" title="Drag to pin a node in place. Shift+click to unpin. Reheat unpins all.">
+            drag=pin · ⇧click=unpin
+          </span>
+          <button onClick={reheat} className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Unpin all nodes and reheat layout"><RefreshCw size={13} /></button>
           <button onClick={() => zoom(0.8)}  className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Zoom in"><ZoomIn    size={14} /></button>
           <button onClick={() => zoom(1.25)} className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Zoom out"><ZoomOut   size={14} /></button>
           <button onClick={fitToView}        className="rounded p-1 text-th-fg-3 hover:bg-th-hover hover:text-th-fg" title="Fit to view"><Maximize2 size={14} /></button>
