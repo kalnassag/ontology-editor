@@ -9,7 +9,8 @@ import {
   forceSimulation,
   forceManyBody,
   forceLink as d3ForceLink,
-  forceCenter,
+  forceX,
+  forceY,
   forceCollide,
   type Simulation,
   type SimulationNodeDatum,
@@ -238,18 +239,30 @@ export default function OntologyGraph({ onClose }: Props) {
     // Stop old sim cleanly
     simRef.current?.stop();
 
+    // Compute degree so orphan nodes can get stronger gravity
+    const degree = new Map<string, number>(allNodes.map((n) => [n.id, 0]));
+    for (const l of links) {
+      const s = typeof l.source === "object" ? (l.source as SimNode).id : l.source;
+      const t = typeof l.target === "object" ? (l.target as SimNode).id : l.target;
+      degree.set(s, (degree.get(s) ?? 0) + 1);
+      degree.set(t, (degree.get(t) ?? 0) + 1);
+    }
+    // Orphan gravity: unconnected nodes get ~3× stronger pull so they stay near the cluster
+    const gravity = (n: SimNode) => (degree.get(n.id) ?? 0) === 0 ? 0.14 : 0.05;
+
     simNodesRef.current = allNodes;
     simLinksRef.current = links;
     nodeMapRef.current  = newMap;
 
     const sim = forceSimulation<SimNode>(allNodes)
-      .force("charge",  forceManyBody<SimNode>().strength(-900).distanceMax(600))
+      .force("charge",  forceManyBody<SimNode>().strength(-1100).distanceMax(700))
       .force("link",    d3ForceLink<SimNode, D3Link>(links)
         .id((d) => d.id)
-        .distance((l) => l.type === "subClassOf" ? 130 : l.type === "datatypeProperty" ? 150 : 210)
-        .strength((l)  => l.type === "subClassOf" ? 0.9 : 0.4))
-      .force("center",  forceCenter(0, 0).strength(0.05))
-      .force("collide", forceCollide<SimNode>((n) => n.kind === "class" ? classR(n) + 20 : 55).strength(0.8))
+        .distance((l) => l.type === "subClassOf" ? 140 : l.type === "datatypeProperty" ? 210 : 230)
+        .strength((l)  => l.type === "subClassOf" ? 0.8 : 0.35))
+      .force("x",       forceX<SimNode>(0).strength(gravity))
+      .force("y",       forceY<SimNode>(0).strength(gravity))
+      .force("collide", forceCollide<SimNode>((n) => n.kind === "class" ? classR(n) + 30 : 58).strength(0.85))
       .alphaDecay(0.015)
       .velocityDecay(0.4)
       .on("tick", scheduleTick);
