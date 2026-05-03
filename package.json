@@ -13,6 +13,8 @@
     "build:serve": "npm run build && npm start"
   },
   "dependencies": {
+    "@types/d3-force": "^3.0.10",
+    "d3-force": "^3.0.0",
     "express": "^4.22.1",
     "idb": "^8.0.1",
     "lucide-react": "^0.468.0",
