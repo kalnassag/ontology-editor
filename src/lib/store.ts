@@ -351,7 +351,7 @@ export const useStore = create<EditorState>((set, get) => {
       if (!current) return { errors: [{ message: "No active ontology to update." }] };
 
       const parsed = parseTurtle(turtleText);
-      if (parsed.errors.length > 0) {
+      if (parsed.errors && parsed.errors.length > 0) {
         return { errors: parsed.errors };
       }
 
