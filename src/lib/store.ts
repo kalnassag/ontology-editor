@@ -355,17 +355,19 @@ export const useStore = create<EditorState>((set, get) => {
         return { errors: parsed.errors };
       }
 
+      const model = buildModelFromTriples(parsed);
+
       const updatedOnto: Ontology = {
         ...current,
         metadata: {
-          ...current.metadata,
+          ...model.metadata,
           baseUri: parsed.baseUri || current.metadata.baseUri,
           prefixes: { ...current.metadata.prefixes, ...parsed.prefixes },
         },
-        classes: parsed.classes,
-        properties: parsed.properties,
-        individuals: parsed.individuals,
-        unmappedTriples: parsed.unmappedTriples,
+        classes: model.classes,
+        properties: model.properties,
+        individuals: model.individuals,
+        unmappedTriples: model.unmappedTriples,
         updatedAt: new Date().toISOString(),
       };
 
