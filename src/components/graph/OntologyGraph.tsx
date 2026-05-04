@@ -366,6 +366,17 @@ export default function OntologyGraph({ onClose }: Props) {
     return () => { simRef.current?.stop(); };
   }, [buildSimulation]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFloatingPanel(null);
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // ── Pan / zoom ────────────────────────────────────────────────────
   const zoom = (factor: number) =>
     setViewBox((vb) => ({
@@ -620,12 +631,48 @@ export default function OntologyGraph({ onClose }: Props) {
   }, []);
 
   // ── Class node ────────────────────────────────────────────────────
+  // ── Wrap label text to fit inside a circle ──────────────────────
+  // Returns an array of lines, each short enough to fit within the chord
+  // at the y-offset where that line sits (chord width = 2*sqrt(r²-y²)).
+  // We use a simple word-split strategy: greedy packing with a char-width estimate.
+  const wrapLabel = (label: string, r: number, fontSize: number): string[] => {
+    const charW = fontSize * 0.58; // monospace-ish estimate
+    const words = label.split(/(?=[A-Z])|[_\s-]+/g).filter(Boolean); // split camelCase + spaces
+    const lines: string[] = [];
+    let current = "";
+
+    for (const word of words) {
+      const test = current ? current + " " + word : word;
+      // Available chord width at this line's vertical position
+      const lineIdx  = lines.length;
+      const totalLines = Math.ceil(label.length * charW / (r * 1.55)); // rough estimate
+      const yOff = (lineIdx - (totalLines - 1) / 2) * (fontSize + 2);
+      const chordW = 2 * Math.sqrt(Math.max(0, r * r - yOff * yOff)) * 0.88; // 88% of chord
+      if (test.length * charW > chordW && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  };
+
   const renderClassNode = useCallback((node: SimNode) => {
     const x     = node.x ?? 0, y = node.y ?? 0;
     const r     = classR(node);
     const isHov = hoveredId === node.id;
     const isPinned = node.fx != null;
-    const lbl   = node.label.length > 14 ? node.label.slice(0, 13) + "…" : node.label;
+
+    // Wrap label to fit inside circle
+    const lines   = wrapLabel(node.label, r, 12);
+    const nLines  = lines.length;
+    const lineH   = 14; // px between baselines
+    const hasProps = node.propertyCount > 0;
+    // Shift text block up slightly when property count is shown below
+    const blockTopY = y - ((nLines - 1) * lineH) / 2 - (hasProps ? lineH * 0.4 : 0);
+
     return (
       <g key={node.id} data-node-id={node.id}
         style={{ cursor: dragNodeRef.current?.id === node.id ? "grabbing" : "grab" }}
@@ -633,18 +680,21 @@ export default function OntologyGraph({ onClose }: Props) {
         onMouseLeave={() => setHoveredId(null)}>
         {isHov && <circle cx={x} cy={y} r={r + 7} fill="none" stroke={V.classStroke} strokeWidth={1.5} opacity={0.4} />}
         <circle cx={x} cy={y} r={r} fill={V.classFill} stroke={isHov ? V.classStroke : "#5577aa"} strokeWidth={isHov ? 2.5 : 2} />
-        <text x={x} y={y - (node.propertyCount > 0 ? 6 : 0)}
-          textAnchor="middle" dominantBaseline="middle"
-          fill={V.classText} fontSize={12} fontWeight={600} fontFamily={FONT} pointerEvents="none">
-          {lbl}
-        </text>
-        {node.propertyCount > 0 && (
-          <text x={x} y={y + 10} textAnchor="middle" dominantBaseline="middle"
+        {lines.map((line, i) => (
+          <text key={i}
+            x={x} y={blockTopY + i * lineH}
+            textAnchor="middle" dominantBaseline="middle"
+            fill={V.classText} fontSize={12} fontWeight={600} fontFamily={FONT} pointerEvents="none">
+            {line}
+          </text>
+        ))}
+        {hasProps && (
+          <text x={x} y={blockTopY + nLines * lineH - 2} textAnchor="middle" dominantBaseline="middle"
             fill="#3355aa" fontSize={9} fontFamily={FONT} pointerEvents="none">
             {node.propertyCount} prop{node.propertyCount !== 1 ? "s" : ""}
           </text>
         )}
-        {/* Pin indicator — small filled dot when node is manually fixed */}
+        {/* Pin indicator */}
         {isPinned && (
           <circle cx={x + r * 0.72} cy={y - r * 0.72} r={4}
             fill="#335599" stroke="white" strokeWidth={1} pointerEvents="none" />
