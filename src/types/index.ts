@@ -142,7 +142,6 @@ export interface OntologyStore {
   deleteOntology: (id: string) => void;
   setActiveOntology: (id: string) => void;
   updateMetadata: (patch: Partial<OntologyMetadata>) => void;
-  updateOntologyFromTurtle: (turtleText: string) => { errors?: ParseError[] };
 
   // Actions — classes
   addClass: (cls: Partial<OntologyClass>) => string;

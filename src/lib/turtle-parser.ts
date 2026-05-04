@@ -824,6 +824,5 @@ export function buildModelFromTriples(parsed: ParseResult): {
     properties: Array.from(propMap.values()),
     individuals: Array.from(individualMap.values()),
     unmappedTriples,
-    errors,
   };
 }

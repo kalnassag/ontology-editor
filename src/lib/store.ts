@@ -345,41 +345,6 @@ export const useStore = create<EditorState>((set, get) => {
       return id;
     },
 
-    updateOntologyFromTurtle: (turtleText: string) => {
-      const state = get();
-      const current = state.getActiveOntology();
-      if (!current) return { errors: [{ message: "No active ontology to update." }] };
-
-      const parsed = parseTurtle(turtleText);
-      if (parsed.errors && parsed.errors.length > 0) {
-        return { errors: parsed.errors };
-      }
-
-      const model = buildModelFromTriples(parsed);
-
-      const updatedOnto: Ontology = {
-        ...current,
-        metadata: {
-          ...model.metadata,
-          baseUri: parsed.baseUri || current.metadata.baseUri,
-          prefixes: { ...current.metadata.prefixes, ...parsed.prefixes },
-        },
-        classes: model.classes,
-        properties: model.properties,
-        individuals: model.individuals,
-        unmappedTriples: model.unmappedTriples,
-        updatedAt: new Date().toISOString(),
-      };
-
-      set((s) => ({
-        _history: [...s._history.slice(-49), s.ontologies],
-        _future: [],
-        ontologies: s.ontologies.map((o) => (o.id === current.id ? updatedOnto : o)),
-      }));
-      persist();
-      return {};
-    },
-
     deleteOntology: (id) => {
       set((s) => {
         const remaining = s.ontologies.filter((o) => o.id !== id);
