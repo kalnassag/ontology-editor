@@ -11,11 +11,12 @@ import ClassDetailPane from "../core/ClassDetailPane";
 
 interface Props {
   onSelectClass: (id: string | null) => void;
+  onDoubleClickClass: (id: string) => void;
   selectedClassId: string | null;
   onEditClass: (id: string) => void;
 }
 
-export default function ClassBrowserPanel({ onSelectClass, selectedClassId, onEditClass }: Props) {
+export default function ClassBrowserPanel({ onSelectClass, onDoubleClickClass, selectedClassId, onEditClass }: Props) {
   const [search, setSearch] = useState("");
 
   return (
@@ -49,6 +50,7 @@ export default function ClassBrowserPanel({ onSelectClass, selectedClassId, onEd
       <div className={`overflow-y-auto px-1 py-1 ${selectedClassId ? "flex-1" : "flex-1"}`}>
         <ClassHierarchyTree
           onSelectClass={onSelectClass}
+          onDoubleClickClass={onDoubleClickClass}
           selectedClassId={selectedClassId}
           search={search}
         />
