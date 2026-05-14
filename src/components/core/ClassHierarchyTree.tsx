@@ -15,6 +15,7 @@ interface TreeNode {
 
 interface Props {
   onSelectClass: (id: string) => void;
+  onDoubleClickClass: (id: string) => void;
   selectedClassId: string | null;
   search: string;
 }
@@ -66,6 +67,7 @@ interface TreeRowProps {
   collapsed: Set<string>;
   onToggle: (id: string) => void;
   onSelect: (id: string) => void;
+  onDoubleClick: (id: string) => void;
   selectedClassId: string | null;
   search: string;
   propertyCountMap: Map<string, number>;
@@ -77,6 +79,7 @@ function TreeRow({
   collapsed,
   onToggle,
   onSelect,
+  onDoubleClick,
   selectedClassId,
   search,
   propertyCountMap,
@@ -106,6 +109,7 @@ function TreeRow({
         }`}
         style={{ paddingLeft: `${4 + node.depth * 12}px` }}
         onClick={() => onSelect(node.cls.id)}
+        onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(node.cls.id); }}
       >
         {/* Expand/collapse toggle */}
         <span
@@ -145,6 +149,7 @@ function TreeRow({
             collapsed={collapsed}
             onToggle={onToggle}
             onSelect={onSelect}
+            onDoubleClick={onDoubleClick}
             selectedClassId={selectedClassId}
             search={search}
             propertyCountMap={propertyCountMap}
@@ -155,7 +160,7 @@ function TreeRow({
   );
 }
 
-export default function ClassHierarchyTree({ onSelectClass, selectedClassId, search }: Props) {
+export default function ClassHierarchyTree({ onSelectClass, onDoubleClickClass, selectedClassId, search }: Props) {
   const activeOntology = useStore((s) => s.getActiveOntology());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -203,6 +208,7 @@ export default function ClassHierarchyTree({ onSelectClass, selectedClassId, sea
           collapsed={collapsed}
           onToggle={handleToggle}
           onSelect={onSelectClass}
+          onDoubleClick={onDoubleClickClass}
           selectedClassId={selectedClassId}
           search={search}
           propertyCountMap={propertyCountMap}

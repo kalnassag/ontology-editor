@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from "../../lib/store";
 import { compact } from "../../lib/uri-utils";
@@ -11,6 +11,7 @@ import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Clipboard } from 'luci
 interface Props {
   cls: OntologyClass;
   defaultExpanded?: boolean;
+  highlighted?: boolean;
 }
 
 const TYPE_ORDER: Array<'owl:ObjectProperty' | 'owl:DatatypeProperty' | 'owl:AnnotationProperty'> = [
@@ -31,7 +32,7 @@ const TYPE_COLOR: Record<string, string> = {
   'owl:AnnotationProperty': 'text-prop-annotation-500',
 };
 
-export default function ClassCard({ cls, defaultExpanded = true }: Props) {
+export default function ClassCard({ cls, defaultExpanded = true, highlighted = false }: Props) {
   const deleteClass = useStore((s) => s.deleteClass);
   const copyClass = useStore((s) => s.copyClass);
   const pasteClipboard = useStore((s) => s.pasteClipboard);
@@ -39,9 +40,16 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
   const getPropertiesByDomain = useStore((s) => s.getPropertiesByDomain);
   const activeOntology = useStore((s) => s.getActiveOntology());
 
+  const cardRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [editingClass, setEditingClass] = useState(false);
   const [addingProperty, setAddingProperty] = useState(false);
+
+  useEffect(() => {
+    if (!highlighted || !cardRef.current) return;
+    cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    setExpanded(true);
+  }, [highlighted]);
 
   const prefixes = activeOntology?.metadata.prefixes ?? {};
   const allClasses = activeOntology?.classes ?? [];
@@ -66,7 +74,12 @@ export default function ClassCard({ cls, defaultExpanded = true }: Props) {
   });
 
   return (
-    <div className="rounded border border-th-border-muted bg-th-surface">
+    <div
+      ref={cardRef}
+      className={`rounded border bg-th-surface transition-shadow duration-300 ${
+        highlighted ? "border-blue-500 ring-2 ring-blue-500/60" : "border-th-border-muted"
+      }`}
+    >
       {/* Header */}
       <div className="flex items-start gap-1">
         <button

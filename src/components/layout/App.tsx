@@ -54,6 +54,7 @@ export default function App() {
   const [expandKey, setExpandKey] = useState(0); // forces re-render of cards with new default
   const [showValidation, setShowValidation] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [highlightedClassId, setHighlightedClassId] = useState<string | null>(null);
   const [classBrowserCollapsed, setClassBrowserCollapsed] = useState(() => {
     return localStorage.getItem("classBrowserCollapsed") === "true";
   });
@@ -68,6 +69,12 @@ export default function App() {
   }, []);
 
   useEffect(() => { init(); }, [init]);
+
+  useEffect(() => {
+    if (!highlightedClassId) return;
+    const t = setTimeout(() => setHighlightedClassId(null), 2000);
+    return () => clearTimeout(t);
+  }, [highlightedClassId]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -168,6 +175,10 @@ export default function App() {
         <aside className="flex w-60 flex-shrink-0 flex-col border-r border-th-border">
           <ClassBrowserPanel
             onSelectClass={setSelectedClassId}
+            onDoubleClickClass={(id) => {
+              setViewMode("classes");
+              setHighlightedClassId(id);
+            }}
             selectedClassId={selectedClassId}
             onEditClass={(id) => {
               setSelectedClassId(id);
@@ -440,7 +451,7 @@ export default function App() {
                   {/* Class cards */}
                   <div className="space-y-2">
                     {sortedClasses.map((cls) => (
-                      <ClassCard key={`${cls.id}-${expandKey}`} cls={cls} defaultExpanded={allExpanded} />
+                      <ClassCard key={`${cls.id}-${expandKey}`} cls={cls} defaultExpanded={allExpanded} highlighted={highlightedClassId === cls.id} />
                     ))}
                   </div>
 
