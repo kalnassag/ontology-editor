@@ -1,22 +1,18 @@
 /**
- * Side panel for browsing the class hierarchy and viewing class details.
- * Shows a collapsible subClassOf tree in the upper section and a detail
- * pane for the selected class in the lower section.
+ * Side panel for browsing the class hierarchy.
  */
 
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 import ClassHierarchyTree from "../core/ClassHierarchyTree";
-import ClassDetailPane from "../core/ClassDetailPane";
 
 interface Props {
   onSelectClass: (id: string | null) => void;
   onDoubleClickClass: (id: string) => void;
   selectedClassId: string | null;
-  onEditClass: (id: string) => void;
 }
 
-export default function ClassBrowserPanel({ onSelectClass, onDoubleClickClass, selectedClassId, onEditClass }: Props) {
+export default function ClassBrowserPanel({ onSelectClass, onDoubleClickClass, selectedClassId }: Props) {
   const [search, setSearch] = useState("");
 
   return (
@@ -46,8 +42,8 @@ export default function ClassBrowserPanel({ onSelectClass, onDoubleClickClass, s
         </div>
       </div>
 
-      {/* Tree — scrollable, takes remaining space above detail pane */}
-      <div className={`overflow-y-auto px-1 py-1 ${selectedClassId ? "flex-1" : "flex-1"}`}>
+      {/* Tree — scrollable */}
+      <div className="flex-1 overflow-y-auto px-1 py-1">
         <ClassHierarchyTree
           onSelectClass={onSelectClass}
           onDoubleClickClass={onDoubleClickClass}
@@ -55,17 +51,6 @@ export default function ClassBrowserPanel({ onSelectClass, onDoubleClickClass, s
           search={search}
         />
       </div>
-
-      {/* Detail pane — shown below tree when a class is selected */}
-      {selectedClassId && (
-        <div className="flex-shrink-0 overflow-hidden">
-          <ClassDetailPane
-            classId={selectedClassId}
-            onEditClass={onEditClass}
-            onSelectClass={onSelectClass}
-          />
-        </div>
-      )}
     </div>
   );
 }

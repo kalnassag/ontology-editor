@@ -180,10 +180,6 @@ export default function App() {
               setHighlightedClassId(id);
             }}
             selectedClassId={selectedClassId}
-            onEditClass={(id) => {
-              setSelectedClassId(id);
-              setViewMode("classes");
-            }}
           />
         </aside>
       )}
