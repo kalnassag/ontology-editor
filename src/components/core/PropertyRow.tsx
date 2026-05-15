@@ -12,6 +12,7 @@ import type { OntologyProperty } from "../../types";
 
 interface Props {
   property: OntologyProperty;
+  onDelete?: (label: string) => void;
 }
 
 const TYPE_BADGE: Record<OntologyProperty["type"], { label: string; className: string }> = {
@@ -20,10 +21,10 @@ const TYPE_BADGE: Record<OntologyProperty["type"], { label: string; className: s
   "owl:AnnotationProperty": { label: "A", className: "bg-prop-annotation-700 text-prop-annotation-100" },
 };
 
-export default function PropertyRow({ property }: Props) {
+export default function PropertyRow({ property, onDelete }: Props) {
   const deleteProperty = useStore((s) => s.deleteProperty);
   const copyProperty = useStore((s) => s.copyProperty);
-  const activeOntology = useStore((s) => s.getActiveOntology());
+  const activeOntology = useStore((s) => s.ontologies.find(o => o.id === s.activeOntologyId));
   const [editing, setEditing] = useState(false);
 
   const prefixes = activeOntology?.metadata.prefixes ?? {};
@@ -106,7 +107,7 @@ export default function PropertyRow({ property }: Props) {
           <Pencil size={11} />
         </button>
         <button
-          onClick={() => deleteProperty(property.id)}
+          onClick={() => { deleteProperty(property.id); onDelete?.(primaryLabel); }}
           className="rounded p-1 text-th-fg-4 hover:text-red-400"
           title="Delete property"
         >

@@ -11,4 +11,4 @@ app.use(express.static(DIST));
 // SPA fallback — serve index.html for all non-asset routes
 app.get('*', (_req, res) => res.sendFile(join(DIST, 'index.html')));
 
-app.listen(PORT, () => console.log(`Ontology Editor running at http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Ontorite running at http://localhost:${PORT}`));

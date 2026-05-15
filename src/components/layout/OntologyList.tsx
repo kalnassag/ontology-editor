@@ -3,7 +3,7 @@
  */
 
 import { useRef, useState } from "react";
-import { Plus, Upload, Trash2, ChevronRight, X, AlertTriangle, Globe, BookOpen, Check } from "lucide-react";
+import { Plus, Upload, Trash2, ChevronRight, X, Globe, BookOpen, Check } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { supportsFileSystemAccess, openTurtleFile } from "../../lib/file-access";
 import { COMMON_ONTOLOGIES } from "../../lib/common-ontologies";
@@ -21,8 +21,8 @@ export default function OntologyList() {
   const deleteOntology = useStore((s) => s.deleteOntology);
   const importOntology = useStore((s) => s.importOntology);
   const importOntologyWithHandle = useStore((s) => s.importOntologyWithHandle);
-  const importWarnings = useStore((s) => s.importWarnings);
-  const clearImportWarnings = useStore((s) => s.clearImportWarnings);
+
+  // Import warnings have been moved to the main panel in App.tsx
 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<NewOntologyForm>({ label: "", baseUri: "" });
@@ -33,6 +33,8 @@ export default function OntologyList() {
   const [urlLoading, setUrlLoading] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [loadedLibraryIds, setLoadedLibraryIds] = useState<Set<string>>(new Set());
+  const [importError, setImportError] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const handleCreate = () => {
     if (!form.label.trim()) return;
@@ -45,13 +47,14 @@ export default function OntologyList() {
   };
 
   const handleImport = async () => {
+    setImportError("");
     // Try the File System Access API first (Chrome/Edge) — gives us a writable handle
     if (supportsFileSystemAccess()) {
       try {
         const result = await openTurtleFile();
         if (!result) return; // user cancelled
         const id = importOntologyWithHandle(result.text, result.fileName, result.handle);
-        console.log("[import] success with file handle, ontology id:", id);
+        if (import.meta.env.DEV) console.log("[import] success with file handle, ontology id:", id);
         return;
       } catch (err) {
         console.error("[import] File System Access API failed, falling back:", err);
@@ -92,16 +95,19 @@ export default function OntologyList() {
         const text = ev.target?.result;
         if (typeof text === "string") {
           const id = importOntology(text, file.name);
-          console.log("[import] success (no file handle), ontology id:", id);
+          if (import.meta.env.DEV) console.log("[import] success (no file handle), ontology id:", id);
         } else {
           console.error("[import] FileReader result was not a string");
         }
       } catch (err) {
         console.error("[import] error during import:", err);
-        alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+        setImportError(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     };
-    reader.onerror = () => console.error("[import] FileReader error");
+    reader.onerror = () => {
+      console.error("[import] FileReader error");
+      setImportError("Import failed: could not read the file.");
+    };
     reader.readAsText(file);
     e.target.value = "";
   };
@@ -150,6 +156,11 @@ export default function OntologyList() {
           onChange={handleFileInputChange}
         />
       </div>
+
+      {/* Inline import error (E4) */}
+      {importError && (
+        <p className="text-2xs text-red-400 px-2 py-1">{importError}</p>
+      )}
 
       {/* URL import form */}
       {importingUrl && (
@@ -256,29 +267,7 @@ export default function OntologyList() {
         </div>
       )}
 
-      {/* Import warnings */}
-      {importWarnings.length > 0 && (
-        <div className="border-b border-amber-600/40 bg-amber-950/30 p-2">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-2xs font-medium text-amber-400">
-              <AlertTriangle size={11} />
-              Import warnings
-            </span>
-            <button
-              onClick={clearImportWarnings}
-              className="rounded p-0.5 text-th-fg-4 hover:text-th-fg"
-              title="Dismiss"
-            >
-              <X size={11} />
-            </button>
-          </div>
-          <ul className="space-y-0.5">
-            {importWarnings.map((w, i) => (
-              <li key={i} className="text-2xs text-amber-300/80">{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Import warnings have been moved to the main panel (App.tsx) */}
 
       {/* Ontology list */}
       <div className="flex-1 overflow-y-auto">
@@ -288,30 +277,68 @@ export default function OntologyList() {
           ontologies.map((onto) => (
             <div
               key={onto.id}
-              onClick={() => setActiveOntology(onto.id)}
-              className={`group flex cursor-pointer items-center gap-1 px-2 py-2 ${
+              onClick={() => { setActiveOntology(onto.id); setPendingDeleteId(null); }}
+              className={`group cursor-pointer px-2 py-2 ${
                 onto.id === activeOntologyId
                   ? "bg-th-hover text-th-fg"
                   : "text-th-fg-3 hover:bg-th-surface hover:text-th-fg"
               }`}
             >
-              <ChevronRight
-                size={12}
-                className={`flex-shrink-0 ${onto.id === activeOntologyId ? "text-blue-400" : "text-th-fg-4"}`}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-xs">{onto.metadata.ontologyLabel || "Untitled"}</div>
-                <div className="truncate font-mono text-2xs text-th-fg-4">
-                  {onto.metadata.baseUri}
+              <div className="flex items-center gap-1">
+                <ChevronRight
+                  size={12}
+                  className={`flex-shrink-0 ${onto.id === activeOntologyId ? "text-blue-400" : "text-th-fg-4"}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs">{onto.metadata.ontologyLabel || "Untitled"}</div>
+                  <div className="truncate font-mono text-2xs text-th-fg-4">
+                    {onto.metadata.baseUri}
+                  </div>
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPendingDeleteId(onto.id);
+                  }}
+                  className="flex-shrink-0 rounded p-1 opacity-0 text-th-fg-4 hover:text-red-400 group-hover:opacity-100"
+                  title="Delete"
+                >
+                  <Trash2 size={11} />
+                </button>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteOntology(onto.id); }}
-                className="flex-shrink-0 rounded p-1 opacity-0 text-th-fg-4 hover:text-red-400 group-hover:opacity-100"
-                title="Delete"
-              >
-                <Trash2 size={11} />
-              </button>
+
+              {/* Inline delete confirmation (U1) */}
+              {pendingDeleteId === onto.id && (
+                <div
+                  className="mt-1.5 ml-4 space-y-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <p className="text-2xs text-th-fg-3">
+                    Delete &ldquo;{onto.metadata.ontologyLabel || "Untitled"}&rdquo;?
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteOntology(onto.id);
+                        setPendingDeleteId(null);
+                      }}
+                      className="rounded bg-red-700 px-2 py-0.5 text-2xs font-medium text-white hover:bg-red-600"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingDeleteId(null);
+                      }}
+                      className="rounded bg-th-hover px-2 py-0.5 text-2xs text-th-fg-2 hover:bg-th-border"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}

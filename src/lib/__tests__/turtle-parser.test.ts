@@ -45,7 +45,7 @@ describe('Turtle Parser', () => {
     expect(pizzaClass).toBeDefined();
     expect(pizzaClass!.restrictions.length).toBe(1);
     
-    const restriction = pizzaClass!.restrictions[0];
+    const restriction = pizzaClass!.restrictions[0]!;
     expect(restriction.propertyUri).toBe('http://example.org/hasTopping');
     expect(restriction.type).toBe('someValuesFrom');
     expect(restriction.value).toBe('http://example.org/Cheese');

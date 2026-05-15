@@ -1,5 +1,5 @@
 /**
- * Zustand store for ontology editor state.
+ * Zustand store for Ontorite state.
  *
  * Single source of truth for all domain data. Persistence goes to both
  * IndexedDB (session survival) and the original file on disk via the
@@ -167,7 +167,7 @@ export const useStore = create<EditorState>((set, get) => {
       fileSaveInProgress: false,
       lastFileSaveTime: ok ? Date.now() : state.lastFileSaveTime,
     });
-    if (ok) console.log("[file-save] auto-saved to", handle.name);
+    if (ok) { if (import.meta.env.DEV) console.log("[file-save] auto-saved to", handle.name); }
   }, 1000);
 
   /** Persist to both IndexedDB and file (if handle exists) */
@@ -235,7 +235,7 @@ export const useStore = create<EditorState>((set, get) => {
         const prev = s._history[s._history.length - 1]!;
         return {
           _history: s._history.slice(0, -1),
-          _future: [...s._future, s.ontologies],
+          _future: [...s._future, s.ontologies].slice(-50),
           ontologies: prev,
         };
       });
@@ -247,7 +247,7 @@ export const useStore = create<EditorState>((set, get) => {
         if (s._future.length === 0) return {};
         const next = s._future[s._future.length - 1]!;
         return {
-          _history: [...s._history, s.ontologies],
+          _history: [...s._history, s.ontologies].slice(-50),
           _future: s._future.slice(0, -1),
           ontologies: next,
         };

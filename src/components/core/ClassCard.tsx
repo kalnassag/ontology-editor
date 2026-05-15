@@ -5,13 +5,17 @@ import { compact } from "../../lib/uri-utils";
 import PropertyRow from './PropertyRow';
 import ClassForm from '../forms/ClassForm';
 import PropertyForm from '../forms/PropertyForm';
-import type { OntologyClass } from "../../types";
+import type { OntologyClass, OntologyProperty } from "../../types";
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Clipboard } from 'lucide-react';
 
 interface Props {
   cls: OntologyClass;
+  /** Properties assigned to this class (passed from App via memoized domain map) */
+  properties: OntologyProperty[];
   defaultExpanded?: boolean;
   highlighted?: boolean;
+  /** Called after deleting this class or one of its properties — for undo toast */
+  onDelete?: (label: string) => void;
 }
 
 const TYPE_ORDER: Array<'owl:ObjectProperty' | 'owl:DatatypeProperty' | 'owl:AnnotationProperty'> = [
@@ -32,18 +36,21 @@ const TYPE_COLOR: Record<string, string> = {
   'owl:AnnotationProperty': 'text-prop-annotation-500',
 };
 
-export default function ClassCard({ cls, defaultExpanded = true, highlighted = false }: Props) {
+export default function ClassCard({ cls, properties, defaultExpanded = true, highlighted = false, onDelete }: Props) {
   const deleteClass = useStore((s) => s.deleteClass);
   const copyClass = useStore((s) => s.copyClass);
   const pasteClipboard = useStore((s) => s.pasteClipboard);
   const clipboard = useStore((s) => s.clipboard);
-  const getPropertiesByDomain = useStore((s) => s.getPropertiesByDomain);
-  const activeOntology = useStore((s) => s.getActiveOntology());
+  // E2: Use stable inline selector instead of getActiveOntology()
+  const activeOntology = useStore((s) => s.ontologies.find(o => o.id === s.activeOntologyId));
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [editingClass, setEditingClass] = useState(false);
   const [addingProperty, setAddingProperty] = useState(false);
+  // E9: Warn before deleting a class with properties
+  const [pendingDelete, setPendingDelete] = useState(false);
 
   useEffect(() => {
     if (!highlighted || !cardRef.current) return;
@@ -51,10 +58,14 @@ export default function ClassCard({ cls, defaultExpanded = true, highlighted = f
     setExpanded(true);
   }, [highlighted]);
 
+  // U10: Scroll property form into view when opened
+  useEffect(() => {
+    if (!addingProperty) return;
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [addingProperty]);
+
   const prefixes = activeOntology?.metadata.prefixes ?? {};
   const allClasses = activeOntology?.classes ?? [];
-  const propertiesByDomain = getPropertiesByDomain();
-  const properties = propertiesByDomain.get(cls.id) ?? [];
 
   const primaryLabel = cls.labels[0]?.value || cls.localName;
   const allLabels = cls.labels;
@@ -72,6 +83,12 @@ export default function ClassCard({ cls, defaultExpanded = true, highlighted = f
     const parent = allClasses.find((c) => c.uri === parentUri);
     return parent?.labels[0]?.value || compact(parentUri, prefixes);
   });
+
+  const handleDeleteClass = () => {
+    deleteClass(cls.id);
+    setPendingDelete(false);
+    onDelete?.(primaryLabel);
+  };
 
   return (
     <div
@@ -160,7 +177,13 @@ export default function ClassCard({ cls, defaultExpanded = true, highlighted = f
               <Pencil size={12} />
             </button>
             <button
-              onClick={() => deleteClass(cls.id)}
+              onClick={() => {
+                if (properties.length > 0) {
+                  setPendingDelete(true);
+                } else {
+                  handleDeleteClass();
+                }
+              }}
               className="rounded p-1 text-th-fg-4 hover:text-red-400"
               title="Delete class"
             >
@@ -169,6 +192,29 @@ export default function ClassCard({ cls, defaultExpanded = true, highlighted = f
           </div>
         </div>
       </div>
+
+      {/* E9: Inline delete confirmation when class has properties */}
+      {pendingDelete && (
+        <div className="mx-3 mb-2 rounded border border-red-900/50 bg-red-950/30 px-3 py-2">
+          <p className="mb-1.5 text-xs text-th-fg-2">
+            Delete &ldquo;{primaryLabel}&rdquo;? Its {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} will become unassigned.
+          </p>
+          <div className="flex gap-1.5">
+            <button
+              onClick={handleDeleteClass}
+              className="rounded bg-red-700 px-2 py-0.5 text-2xs font-medium text-white hover:bg-red-600"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setPendingDelete(false)}
+              className="rounded bg-th-hover px-2 py-0.5 text-2xs text-th-fg-2 hover:bg-th-border"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Edit class form */}
       {editingClass && (
@@ -197,7 +243,11 @@ export default function ClassCard({ cls, defaultExpanded = true, highlighted = f
                       {TYPE_LABEL[type]}
                     </div>
                     {group.map((prop) => (
-                      <PropertyRow key={prop.id} property={prop} />
+                      <PropertyRow
+                        key={prop.id}
+                        property={prop}
+                        onDelete={onDelete ? (label) => onDelete(label) : undefined}
+                      />
                     ))}
                   </div>
                 );
@@ -253,7 +303,7 @@ export default function ClassCard({ cls, defaultExpanded = true, highlighted = f
 
               {/* Add-property form */}
               {addingProperty ? (
-                <div className="px-3 pt-1.5">
+                <div ref={formRef} className="px-3 pt-1.5">
                   <PropertyForm
                     defaultDomainUri={cls.uri}
                     onDone={() => setAddingProperty(false)}

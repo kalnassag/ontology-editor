@@ -25,7 +25,7 @@ const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
 export default function PropertyForm({ existing, defaultDomainUri, onDone }: Props) {
   const addProperty = useStore((s) => s.addProperty);
   const updateProperty = useStore((s) => s.updateProperty);
-  const activeOntology = useStore((s) => s.getActiveOntology());
+  const activeOntology = useStore((s) => s.ontologies.find(o => o.id === s.activeOntologyId));
 
   const prefixes = activeOntology?.metadata.prefixes ?? {};
   const baseUri = activeOntology?.metadata.baseUri ?? "";
@@ -47,8 +47,16 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
   const [ranges, setRanges] = useState<string[]>(existing?.ranges ?? []);
   const [rangeInput, setRangeInput] = useState(""); // for annotation free-text input
   const [subPropertyOf, setSubPropertyOf] = useState<string[]>(existing?.subPropertyOf ?? []);
-  // "pills" = current tag-buttons, "dropdown" = compact searchable select
-  const [propPickerMode, setPropPickerMode] = useState<"pills" | "dropdown">("pills");
+  // "pills" = current tag-buttons (shown as "Compact"), "dropdown" = searchable select (shown as "List")
+  const [propPickerMode, setPropPickerMode] = useState<"pills" | "dropdown">(
+    () => {
+      const allProps = activeOntology?.properties ?? [];
+      const count = allProps.filter(
+        (p) => p.type === (existing?.type ?? "owl:DatatypeProperty") && (!existing || p.id !== existing.id)
+      ).length;
+      return count > 20 ? "dropdown" : "pills";
+    }
+  );
   const [inverseOf, setInverseOf] = useState(existing?.inverseOf ?? "");
   const [minCard, setMinCard] = useState(existing?.minCardinality !== undefined ? String(existing.minCardinality) : "");
   const [maxCard, setMaxCard] = useState(existing?.maxCardinality !== undefined ? String(existing.maxCardinality) : "");
@@ -392,11 +400,11 @@ export default function PropertyForm({ existing, defaultDomainUri, onDone }: Pro
               <button
                 onClick={() => setPropPickerMode("pills")}
                 className={`px-2 py-0.5 ${propPickerMode === "pills" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
-              >Pills</button>
+              >Compact</button>
               <button
                 onClick={() => setPropPickerMode("dropdown")}
                 className={`border-l border-th-border px-2 py-0.5 ${propPickerMode === "dropdown" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
-              >Dropdown</button>
+              >List</button>
             </div>
           </div>
 

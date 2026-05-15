@@ -2,7 +2,7 @@
  * IndexedDB persistence for ontologies using the `idb` library.
  *
  * Schema:
- *   Database: "ontology-editor"
+ *   Database: "ontology-editor" (legacy name, retained to preserve existing user data)
  *   Object store: "ontologies" (keyPath: "id")
  *
  * All operations are async. The store should call saveOntology() on every

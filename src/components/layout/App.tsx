@@ -3,7 +3,7 @@
  * Layout: sidebar (ontology list) + main panel (class/property editor)
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useStore } from "../../lib/store";
 import OntologyList from "./OntologyList";
 import ClassCard from "../core/ClassCard";
@@ -16,8 +16,15 @@ import IndividualCard from "../core/IndividualCard";
 import ValidationPanel from "../core/ValidationPanel";
 import ClassBrowserPanel from "./ClassBrowserPanel";
 import OntologyDiff from "../core/OntologyDiff";
+import Toast from "./Toast";
+import KeyboardHelp from "./KeyboardHelp";
 import { validate } from "../../lib/validation";
-import { Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users, ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen, Clipboard, X, GitCompare } from "lucide-react";
+import type { OntologyProperty } from "../../types";
+import {
+  Plus, Sun, Moon, Network, ChevronsDown, ChevronsUp, Layers, Users,
+  ShieldCheck, Share2, PanelLeftClose, PanelLeftOpen, Clipboard, X,
+  GitCompare, AlertCircle, AlertTriangle, RotateCcw, RotateCw, HelpCircle,
+} from "lucide-react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -39,7 +46,8 @@ type ViewMode = "classes" | "individuals" | "graph" | "entity-graph" | "diff";
 export default function App() {
   const init = useStore((s) => s.init);
   const initialized = useStore((s) => s.initialized);
-  const activeOntology = useStore((s) => s.getActiveOntology());
+  // E2: Use stable inline selector instead of getActiveOntology()
+  const activeOntology = useStore((s) => s.ontologies.find(o => o.id === s.activeOntologyId));
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const canUndo = useStore((s) => s.canUndo);
@@ -47,6 +55,11 @@ export default function App() {
   const clipboard = useStore((s) => s.clipboard);
   const pasteClipboard = useStore((s) => s.pasteClipboard);
   const clearClipboard = useStore((s) => s.clearClipboard);
+  const saveToFile = useStore((s) => s.saveToFile);
+  // U7: Import warnings in main panel
+  const importWarnings = useStore((s) => s.importWarnings);
+  const clearImportWarnings = useStore((s) => s.clearImportWarnings);
+
   const [addingClass, setAddingClass] = useState(false);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("classes");
@@ -58,7 +71,14 @@ export default function App() {
   const [classBrowserCollapsed, setClassBrowserCollapsed] = useState(() => {
     return localStorage.getItem("classBrowserCollapsed") === "true";
   });
+  // U2: Toast for undo after delete
+  const [toast, setToast] = useState<{ message: string; action: () => void } | null>(null);
+  // U9: Keyboard shortcut help overlay
+  const [showHelp, setShowHelp] = useState(false);
   const theme = useTheme();
+
+  // U8: Ref for scrolling to unassigned properties
+  const unassignedRef = useRef<HTMLDivElement>(null);
 
   const toggleClassBrowser = useCallback(() => {
     setClassBrowserCollapsed((prev) => {
@@ -75,6 +95,13 @@ export default function App() {
     const t = setTimeout(() => setHighlightedClassId(null), 2000);
     return () => clearTimeout(t);
   }, [highlightedClassId]);
+
+  // U7: Auto-dismiss import warnings after 30 seconds
+  useEffect(() => {
+    if (importWarnings.length === 0) return;
+    const t = setTimeout(() => clearImportWarnings(), 30000);
+    return () => clearTimeout(t);
+  }, [importWarnings.length, clearImportWarnings]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -102,11 +129,15 @@ export default function App() {
             setViewMode("classes");
           }
         }
+      } else if (e.key === "s") {
+        // E6: Ctrl+S to save to file
+        e.preventDefault();
+        saveToFile();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, canUndo, canRedo, clipboard, pasteClipboard]);
+  }, [undo, redo, canUndo, canRedo, clipboard, pasteClipboard, saveToFile]);
 
   const toggleExpandAll = useCallback(() => {
     setAllExpanded((prev) => {
@@ -115,6 +146,42 @@ export default function App() {
       return next;
     });
   }, []);
+
+  // U2: Toast helper
+  const showToast = useCallback((message: string, action: () => void) => {
+    setToast({ message, action });
+  }, []);
+
+  // E1: Memoize properties-by-domain map at App level
+  const propertiesByDomain = useMemo(() => {
+    const map = new Map<string, OntologyProperty[]>();
+    if (!activeOntology) return map;
+    for (const cls of activeOntology.classes) map.set(cls.id, []);
+    for (const prop of activeOntology.properties) {
+      if (prop.domainUri) {
+        const cls = activeOntology.classes.find(c => c.uri === prop.domainUri);
+        if (cls) {
+          const list = map.get(cls.id) ?? [];
+          list.push(prop);
+          map.set(cls.id, list);
+        }
+      }
+    }
+    return map;
+  }, [activeOntology?.properties, activeOntology?.classes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // U4: Auto-running validation
+  const validationIssues = useMemo(
+    () => (activeOntology ? validate(activeOntology) : []),
+    [activeOntology]
+  );
+
+  // U8: Unassigned property count
+  const unassignedCount = useMemo(() => {
+    if (!activeOntology) return 0;
+    const classUris = new Set(activeOntology.classes.map(c => c.uri));
+    return activeOntology.properties.filter(p => !p.domainUri || !classUris.has(p.domainUri)).length;
+  }, [activeOntology]);
 
   if (!initialized) {
     return (
@@ -148,6 +215,10 @@ export default function App() {
     a.localName.localeCompare(b.localName)
   );
 
+  // Validation icon for U4
+  const hasErrors = validationIssues.some(i => i.severity === "error");
+  const hasWarnings = validationIssues.length > 0;
+
   return (
     <div className="flex h-screen overflow-hidden bg-th-base font-sans text-th-fg">
       {/* Panel 1: Ontology list */}
@@ -155,11 +226,19 @@ export default function App() {
         <div className="flex items-center gap-2 border-b border-th-border px-3 py-2.5">
           <div className="h-2 w-2 rounded-full bg-blue-500" />
           <h1 className="text-xs font-semibold tracking-tight text-th-fg-2">
-            Ontology Editor
+            Ontorite
           </h1>
+          {/* U9: Keyboard help button */}
+          <button
+            onClick={() => setShowHelp(v => !v)}
+            className="ml-auto rounded p-1 text-th-fg-3 hover:text-th-fg"
+            title="Keyboard shortcuts"
+          >
+            <HelpCircle size={13} />
+          </button>
           <button
             onClick={theme.toggle}
-            className="ml-auto rounded p-1 text-th-fg-3 hover:text-th-fg"
+            className="rounded p-1 text-th-fg-3 hover:text-th-fg"
             title={theme.dark ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme.dark ? <Sun size={13} /> : <Moon size={13} />}
@@ -169,6 +248,9 @@ export default function App() {
           <OntologyList />
         </div>
       </aside>
+
+      {/* U9: Keyboard help overlay */}
+      {showHelp && <KeyboardHelp onClose={() => setShowHelp(false)} />}
 
       {/* Panel 2: Class browser (only when an ontology is loaded) */}
       {activeOntology && !classBrowserCollapsed && (
@@ -300,7 +382,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Undo / Redo */}
+              {/* U3: Undo / Redo with Lucide icons */}
               <div className="flex items-center gap-0.5">
                 <button
                   onClick={undo}
@@ -308,7 +390,7 @@ export default function App() {
                   className="rounded px-1.5 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg disabled:cursor-not-allowed disabled:opacity-30"
                   title="Undo (Ctrl+Z)"
                 >
-                  ↩
+                  <RotateCcw size={13} />
                 </button>
                 <button
                   onClick={redo}
@@ -316,7 +398,7 @@ export default function App() {
                   className="rounded px-1.5 py-1 text-2xs text-th-fg-3 hover:bg-th-hover hover:text-th-fg disabled:cursor-not-allowed disabled:opacity-30"
                   title="Redo (Ctrl+Y)"
                 >
-                  ↪
+                  <RotateCw size={13} />
                 </button>
               </div>
 
@@ -343,18 +425,40 @@ export default function App() {
                 </div>
               )}
 
-              {/* Validate */}
+              {/* U8: Unassigned badge */}
+              {unassignedCount > 0 && (
+                <button
+                  onClick={() => unassignedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-amber-500 hover:bg-th-hover"
+                  title="Scroll to unassigned properties"
+                >
+                  ⚠ {unassignedCount} unassigned
+                </button>
+              )}
+
+              {/* U4: Validate button with auto badge */}
               <button
                 onClick={() => setShowValidation((v) => !v)}
-                className={`flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium ${
+                className={`relative flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium ${
                   showValidation
                     ? "bg-th-hover text-th-fg"
                     : "text-th-fg-3 hover:bg-th-hover hover:text-th-fg"
                 }`}
                 title="Toggle validation panel"
               >
-                <ShieldCheck size={12} />
+                {hasErrors ? (
+                  <AlertCircle size={12} className="text-red-400" />
+                ) : hasWarnings ? (
+                  <AlertTriangle size={12} className="text-amber-400" />
+                ) : (
+                  <ShieldCheck size={12} />
+                )}
                 Validate
+                {validationIssues.length > 0 && (
+                  <span className={`ml-0.5 rounded px-1 text-2xs font-bold ${hasErrors ? "bg-red-700 text-white" : "bg-amber-700 text-white"}`}>
+                    {validationIssues.length}
+                  </span>
+                )}
               </button>
 
               <ImportExport />
@@ -363,9 +467,35 @@ export default function App() {
             {/* Validation panel */}
             {showValidation && activeOntology && (
               <ValidationPanel
-                issues={validate(activeOntology)}
+                issues={validationIssues}
                 onClose={() => setShowValidation(false)}
               />
+            )}
+
+            {/* U7: Import warnings banner in main panel */}
+            {importWarnings.length > 0 && (
+              <div className="border-b border-amber-600/40 bg-amber-950/30 px-4 py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-amber-400" />
+                    <div>
+                      <p className="text-xs font-medium text-amber-400">Import warnings</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {importWarnings.map((w, i) => (
+                          <li key={i} className="text-xs text-amber-300/80">{w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  <button
+                    onClick={clearImportWarnings}
+                    className="flex-shrink-0 rounded p-0.5 text-th-fg-4 hover:text-th-fg"
+                    title="Dismiss"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Content: graph, entity-graph, diff, classes, or individuals */}
@@ -447,7 +577,14 @@ export default function App() {
                   {/* Class cards */}
                   <div className="space-y-2">
                     {sortedClasses.map((cls) => (
-                      <ClassCard key={`${cls.id}-${expandKey}`} cls={cls} defaultExpanded={allExpanded} highlighted={highlightedClassId === cls.id} />
+                      <ClassCard
+                        key={`${cls.id}-${expandKey}`}
+                        cls={cls}
+                        properties={propertiesByDomain.get(cls.id) ?? []}
+                        defaultExpanded={allExpanded}
+                        highlighted={highlightedClassId === cls.id}
+                        onDelete={(label) => showToast(`"${label}" deleted`, undo)}
+                      />
                     ))}
                   </div>
 
@@ -457,8 +594,10 @@ export default function App() {
                     </p>
                   )}
 
-                  {/* Unassigned properties */}
-                  <UnassignedProperties />
+                  {/* U8: Unassigned properties with forwardRef */}
+                  <div ref={unassignedRef}>
+                    <UnassignedProperties />
+                  </div>
                 </div>
               </div>
             )}
@@ -472,6 +611,16 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* U2: Undo toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          actionLabel="Undo"
+          onAction={toast.action}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

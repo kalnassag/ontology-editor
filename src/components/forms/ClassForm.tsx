@@ -18,7 +18,7 @@ interface Props {
 export default function ClassForm({ existing, onDone }: Props) {
   const addClass = useStore((s) => s.addClass);
   const updateClass = useStore((s) => s.updateClass);
-  const activeOntology = useStore((s) => s.getActiveOntology());
+  const activeOntology = useStore((s) => s.ontologies.find(o => o.id === s.activeOntologyId));
 
   const prefixes = activeOntology?.metadata.prefixes ?? {};
   const baseUri = activeOntology?.metadata.baseUri ?? "";
@@ -35,8 +35,14 @@ export default function ClassForm({ existing, onDone }: Props) {
   const [uriValue, setUriValue] = useState(existing?.uri ?? "");
   const [subClassOf, setSubClassOf] = useState<string[]>(existing?.subClassOf ?? []);
   const [disjointWith, setDisjointWith] = useState<string[]>(existing?.disjointWith ?? []);
-  // "pills" = current tag-buttons, "dropdown" = a searchable select
-  const [classPickerMode, setClassPickerMode] = useState<"pills" | "dropdown">("pills");
+  // "pills" = current tag-buttons (shown as "Compact"), "dropdown" = searchable select (shown as "List")
+  const [classPickerMode, setClassPickerMode] = useState<"pills" | "dropdown">(
+    () => {
+      const allCls = activeOntology?.classes ?? [];
+      const count = existing ? allCls.filter((c) => c.id !== existing.id).length : allCls.length;
+      return count > 20 ? "dropdown" : "pills";
+    }
+  );
 
   // Extra triples — stored in compact/prefixed form for editing
   const [extraTriples, setExtraTriples] = useState<ExtraTriple[]>(
@@ -192,13 +198,13 @@ export default function ClassForm({ existing, onDone }: Props) {
               <button
                 onClick={() => setClassPickerMode("pills")}
                 className={`px-2 py-0.5 ${classPickerMode === "pills" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
-                title="Show as pill toggles"
-              >Pills</button>
+                title="Show as compact toggles"
+              >Compact</button>
               <button
                 onClick={() => setClassPickerMode("dropdown")}
                 className={`px-2 py-0.5 border-l border-th-border ${classPickerMode === "dropdown" ? "bg-th-hover text-th-fg" : "text-th-fg-4 hover:text-th-fg-2"}`}
-                title="Show as dropdown"
-              >Dropdown</button>
+                title="Show as list"
+              >List</button>
             </div>
           </div>
 

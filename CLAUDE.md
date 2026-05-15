@@ -1,4 +1,4 @@
-# Ontology Editor — Claude Code Guide
+# Ontorite — Claude Code Guide
 
 ## Project Overview
 
